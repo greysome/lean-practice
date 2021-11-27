@@ -36,10 +36,7 @@ lemma eq_last_of_not_lt {k : ℕ} {m : fin k.succ} (h : ¬↑m < k) : ↑m = k :
 
 lemma fib_inv_strict_mono {m n : ℕ} (h : fib m < fib n) : m < n :=
 begin
-  by_contra h1,
-  replace h1 := not_lt.mp h1,
-  replace h1 := fib_mono h1,
-  exact not_lt.mpr h1 h,
+  by_contra h1, exact not_lt.mpr (fib_mono (not_lt.mp h1)) h,
 end
 
 theorem zeckendorf_existence (n : ℕ) : n = 0 ∨ has_zeckendorf_rep n :=
@@ -125,15 +122,18 @@ begin
         change n' < m' at hmn',
         dsimp,
         split_ifs with h1 h2 h3,
+
         -- n < m < k → use the hypothesis
         { apply frest,
           change n'.cast_lt h2 < m'.cast_lt h1,
           rwa fin.lt_iff_coe_lt_coe at ⊢ hmn' },
+
         -- m > n, m < k = n → contradiction
         { exfalso,
           rw fin.lt_iff_coe_lt_coe at hmn',
           have : ¬↑n' < ↑m' := nat.lt_asymm (nat.lt_of_lt_of_le h1 (not_lt.mp h2)),
           exact this hmn' },
+
         -- n < k = m → the interesting case
         { have ha : n-F < fib (l-1),
           { by_contra h,
@@ -166,6 +166,7 @@ begin
           
           replace hb := fib_inv_strict_mono hb,
           exact lt_tsub_iff_right.mp hb },
+
         -- m > n, m = k, n = k → contradiction
         { exfalso,
           replace h1 := eq_last_of_not_lt h1,
@@ -173,6 +174,7 @@ begin
           rw fin.lt_iff_coe_lt_coe at hmn',
           rw [h1, h3] at hmn',
           exact nat.lt_asymm hmn' hmn' } } },
+
     -- It sums up to n
     { rw [←nat.sub_add_cancel F_le_n, ←fsum, hF, hfibs, hl],
       rw fin.sum_univ_cast_succ,
