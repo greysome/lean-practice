@@ -1,22 +1,32 @@
 import algebra.ring.basic
 import algebra.big_operators.basic
 import algebra.group.units
+import data.polynomial.basic
+import data.polynomial.coeff
+import data.polynomial.degree.definitions
 import order.locally_finite
 import ring_theory.nilpotent
+import ring_theory.polynomial.content
 import tactic
-open finset tactic
+open finset tactic polynomial
 open_locale big_operators
 
 variables {R : Type} [comm_ring R] [nontrivial R]
 
+/-
+1.1: sum of unit and nilpotent is a unit
+Note: An alternative approach is to use the characterisation of members
+of the Jacobson radical, and apply it to nilpotent elements.
+-/
 lemma mul_neg_one_square (r : R) : r * (-1) ^ 2 = r := by ring
 
 theorem unit_of_one_plus_nilpotent (r : R) (h : is_nilpotent r) :
   is_unit (1 + r) :=
 begin
+  rw is_unit_iff_exists_inv',
   by_cases rzero : r = 0,
   rw [rzero, add_zero],
-  exact is_unit_one,
+  use ⟨1, by ring⟩,
 
   obtain ⟨n, hn⟩ := h,
   have npos : n > 0,
@@ -60,28 +70,69 @@ begin
     },
     rw sum_const_zero, dsimp [S], rw hn, ring },
 
-  let u : units R := {
-    val := 1 + r,
-    inv := inv,
-    val_inv := by rwa mul_comm,
-    inv_val := S_inv
-  },
-  use ⟨u, rfl⟩
+  use inv, exact S_inv
 end
 
-lemma nilpotent_of_unit_mul_nilpotent (u : units R) (r : R) (h : is_nilpotent r) :
-  is_nilpotent (↑u * r) :=
+lemma nilpotent_of_mul_nilpotent (a r : R) (hr : is_nilpotent r) :
+  is_nilpotent (a * r) :=
 begin
-  obtain ⟨n, hn⟩ := h,
+  obtain ⟨n, hn⟩ := hr,
   use n,
   rw [mul_pow, hn, mul_zero]
 end
 
-theorem unit_of_unit_plus_nilpotent (u : units R) (r : R) (h : is_nilpotent r) :
-  is_unit (↑u + r) :=
+theorem unit_of_unit_plus_nilpotent (u r : R) (hu : is_unit u) (hr : is_nilpotent r) :
+  is_unit (u + r) :=
 begin
-  rw [←(units.is_unit_mul_units _ u⁻¹), add_mul],
-  rw [units.mul_inv, mul_comm],
-  apply unit_of_one_plus_nilpotent,
-  exact nilpotent_of_unit_mul_nilpotent u⁻¹ r h
+  have hu' := hu,  -- For the last line
+  rw is_unit_iff_exists_inv at hu,
+  obtain ⟨v, huv⟩ := hu,
+
+  have : u + r = u * (1 + v * r) :=
+    by { rw [mul_add, ←mul_assoc], rw huv, simp },
+  rw this,
+
+  exact is_unit.mul hu'
+    (unit_of_one_plus_nilpotent _ (nilpotent_of_mul_nilpotent _ _ hr)),
 end
+
+/-
+1.2: characterisation of units, nilpotents, zero divisors in R[x],
+and primitive elements
+-/
+theorem ex1_2i (p : polynomial R) :
+  is_unit p ↔ is_unit (p.coeff 0) ∧ ∀ (n : ℕ), n > 0 → is_nilpotent (p.coeff n) :=
+begin
+  split,
+  { repeat { rw is_unit_iff_exists_inv },
+    rintro ⟨q, hpq⟩,
+    split,
+    { use q.coeff 0,
+      rw polynomial.ext_iff at hpq,
+      specialize hpq 0,
+      rwa [mul_coeff_zero, coeff_one_zero] at hpq },
+    -- The hard part
+    { sorry } },
+  { rintro ⟨hconst, hp⟩,
+    let d' := p.degree,
+    have : d' ≠ ⊥ := sorry,
+    have d := with_bot.unbot d' this,
+    clear this d',
+    sorry }
+end
+
+theorem ex1_2ii (p : polynomial R) :
+  is_nilpotent p ↔ ∀ (n : ℕ), is_nilpotent (p.coeff n) :=
+begin
+  sorry
+end
+
+def is_zero_divisor (a : R) : Prop := a ≠ 0 ∧ ∃ b, b ≠ 0 ∧ a * b = 0
+
+theorem ex1_2iii (p : polynomial R) :
+  is_zero_divisor p ↔ ∃ (a : R), a ≠ 0 ∧ a • p = 0 :=
+sorry
+
+theorem ex1_2iv (p q : polynomial R) :
+  (p * q).is_primitive ↔ p.is_primitive ∧ q.is_primitive :=
+sorry

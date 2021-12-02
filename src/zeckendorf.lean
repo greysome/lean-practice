@@ -19,12 +19,12 @@ lemma trivial_rep_is_zeckendorf (f : fin 1 → ℕ) (h : f ⟨0, by norm_num⟩ 
 begin
   split,
   { assumption },
-  { intros m n hmn,
+  { intros m n hinductn,
     exfalso,
-    have hm0 : m = 0 := fin.eq_zero m,
+    have hinduct0 : m = 0 := fin.eq_zero m,
     have hn0 : n = 0 := fin.eq_zero n,
     subst hn0,
-    exact (ne_of_gt hmn) hm0, }
+    exact (ne_of_gt hinductn) hinduct0, }
 end
 
 lemma fib_three : fib 3 = 2 := begin
@@ -39,26 +39,24 @@ begin
   by_contra h1, exact not_lt.mpr (fib_mono (not_lt.mp h1)) h,
 end
 
-theorem zeckendorf_existence (n : ℕ) : n = 0 ∨ has_zeckendorf_rep n :=
+theorem zeckendorf_existence (n : ℕ) : n > 0 → has_zeckendorf_rep n :=
 begin
   apply nat.strong_induction_on n,
   clear n,
-  intros n hm,
+  intros n hinduct hn,
 
   -- Trivial cases
   by_cases n_eq_0 : n = 0,
-    left, assumption,
+  { exfalso, exact (ne_of_gt hn) n_eq_0 },
   
   by_cases n_eq_1 : n = 1,
-  { right,
-    use [1, by norm_num, (λ i, 2)], -- 1 = fib 2
+  { use [1, by norm_num, (λ i, 2)], -- 1 = fib 2
     split,
     { exact trivial_rep_is_zeckendorf _ (by norm_num) },
     { rw [fintype.sum_unique, n_eq_1, fib_two] } },
 
   by_cases n_eq_2 : n = 2,
-  { right,
-    use [1, by norm_num, (λ i, 3)], -- 2 = fib 3
+  { use [1, by norm_num, (λ i, 3)], -- 2 = fib 3
     split,
     { exact trivial_rep_is_zeckendorf _ (by norm_num) },
     { rw [fintype.sum_unique, n_eq_2, fib_three] } },
@@ -71,7 +69,6 @@ begin
     rw nat.succ_le_iff,
     rwa pos_iff_ne_zero },
   clear n_eq_0 n_eq_1 n_eq_2,
-  right,
 
   set fibs := λ i, ∃ k, i = fib k with hfibs,
   -- F = fib l is the greatest Fibonacci number ≤ n
@@ -97,7 +94,7 @@ begin
   { refine nat.sub_lt _ (nat.succ_le_iff.mp (le_of_succ_le two_le_F)),
     exact pos_of_gt n_ge_2 },
   have F_le_n : F ≤ n := nat.find_greatest_le,
-  have hnF := hm (n - F) nF_lt_n,
+  have hnF := hinduct (n - F) nF_lt_n,
 
   cases hnF with nF0 hnF,
   -- n = F is a Fibonacci number, thus has trivial Zeckendorf representation
@@ -118,21 +115,21 @@ begin
     -- This is indeed a Zeckendorf representation
     { split,
       { convert f0, dsimp, rw dif_pos, refl },
-      { intros m' n' hmn',
-        change n' < m' at hmn',
+      { intros m' n' hinductn',
+        change n' < m' at hinductn',
         dsimp,
         split_ifs with h1 h2 h3,
 
         -- n < m < k → use the hypothesis
         { apply frest,
           change n'.cast_lt h2 < m'.cast_lt h1,
-          rwa fin.lt_iff_coe_lt_coe at ⊢ hmn' },
+          rwa fin.lt_iff_coe_lt_coe at ⊢ hinductn' },
 
         -- m > n, m < k = n → contradiction
         { exfalso,
-          rw fin.lt_iff_coe_lt_coe at hmn',
+          rw fin.lt_iff_coe_lt_coe at hinductn',
           have : ¬↑n' < ↑m' := nat.lt_asymm (nat.lt_of_lt_of_le h1 (not_lt.mp h2)),
-          exact this hmn' },
+          exact this hinductn' },
 
         -- n < k = m → the interesting case
         { have ha : n-F < fib (l-1),
@@ -171,9 +168,9 @@ begin
         { exfalso,
           replace h1 := eq_last_of_not_lt h1,
           replace h3 := eq_last_of_not_lt h3,
-          rw fin.lt_iff_coe_lt_coe at hmn',
-          rw [h1, h3] at hmn',
-          exact nat.lt_asymm hmn' hmn' } } },
+          rw fin.lt_iff_coe_lt_coe at hinductn',
+          rw [h1, h3] at hinductn',
+          exact nat.lt_asymm hinductn' hinductn' } } },
 
     -- It sums up to n
     { rw [←nat.sub_add_cancel F_le_n, ←fsum, hF, hfibs, hl],
