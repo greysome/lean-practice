@@ -1,4 +1,6 @@
 import data.nat.basic
+import data.int.basic
+import data.real.basic
 open classical
 
 variables (α : Type) (p q : α → Prop) (r : Prop)
@@ -188,3 +190,23 @@ iff.intro
       (assume h2 : ¬ r,
         exists.intro a
           (assume r1 : r, false.elim (h2 r1))))
+
+-- Some calculation
+variables log exp : real → real
+variable log_exp_eq : ∀ x, log (exp x) = x
+variable exp_log_eq : ∀ x, x > 0 → exp (log x) = x
+variable exp_pos : ∀ x, exp x > 0
+variable exp_add : ∀ x y, exp (x + y) = exp x * exp y
+include log_exp_eq exp_log_eq exp_pos exp_add
+
+theorem log_mul {x y : real} (hx : x > 0) (hy : y > 0) :
+  log (x * y) = log x + log y :=
+calc log (x * y) = log (x * exp (log y)) : by rw exp_log_eq y hy
+... = log (exp (log x) * exp (log y)) : by rw exp_log_eq x hx
+... = log (exp (log x + log y)) : by rw exp_add
+... = log x + log y : log_exp_eq _
+
+example (x : ℤ) : x * 0 = 0 :=
+calc x * 0 = x * (x - x) : by rw ←sub_self
+... = x * x - x * x : by rw mul_sub
+... = 0 : by rw sub_self
