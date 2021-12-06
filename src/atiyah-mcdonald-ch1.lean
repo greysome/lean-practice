@@ -1,6 +1,7 @@
 import algebra.ring.basic
 import algebra.big_operators.basic
 import algebra.group.units
+import data.nat.basic
 import data.polynomial.basic
 import data.polynomial.coeff
 import data.polynomial.degree.definitions
@@ -9,7 +10,7 @@ import order.locally_finite
 import ring_theory.nilpotent
 import ring_theory.polynomial.content
 import tactic
-open finset tactic polynomial
+open finset tactic polynomial nat set
 open_locale big_operators
 
 variables {R : Type} [comm_ring R] [nontrivial R]
@@ -60,7 +61,7 @@ begin
           rw [sum_eq_sum_Ico_succ_bot npos, zero_add],
           skip,
           rw sum_Ico_add (λ k, (-1) * S k),
-          rw sum_Ico_succ_top (nat.succ_le_iff.mpr npos),
+          rw sum_Ico_succ_top (succ_le_iff.mpr npos),
         }
       },
       repeat { dsimp only },
@@ -144,6 +145,57 @@ begin
   refl,
 end
 
+lemma add_lt_of_lt_and_le {a b c d : ℕ} (h1 : a < b) (h2 : c ≤ d) :
+  a + c < b + d :=
+begin
+  calc a + c < b + c : add_lt_add_right h1 c
+  ... ≤ b + d : add_le_add_left h2 b,
+end
+
+lemma mul_left_of_eq {a b : R} (c : R) (h : a = b) : c * a = c * b :=
+  by { rw h }
+
+lemma sum_antidiagonal_split {a b : ℕ} {f : ℕ × ℕ → R} :
+  ∑ (x : ℕ × ℕ) in nat.antidiagonal (a + b), f x =
+  ∑ x in nat.antidiagonal (a + b) \ {(a, b)}, f x + f (a, b) :=
+begin
+  have h : {(a, b)} ⊆ nat.antidiagonal (a + b),
+  { intro x,
+    rw [finset.mem_singleton, nat.mem_antidiagonal],
+    intro hx, rw hx },
+  rw [←sum_sdiff h, sum_singleton],
+end
+
+lemma antidiagonal_gt_of {a b : ℕ} {x : ℕ × ℕ}
+  (h : x ∈ nat.antidiagonal (a + b) \ {(a, b)}):
+  x.fst > a ∨ x.snd > b :=
+begin
+  rw [mem_sdiff, nat.mem_antidiagonal, finset.mem_singleton,
+      prod.ext_iff, not_and_distrib] at h,
+  rcases h with ⟨hx1, hx2⟩,
+  dsimp at hx2,
+
+  by_contra h,
+  rw not_or_distrib at h,
+  cases hx2,
+  { have contra := add_lt_of_lt_and_le
+      ((ne.le_iff_lt hx2).mp (le_of_not_gt h.left))
+      (le_of_not_gt h.right),
+    exact (ne_of_lt contra) hx1 },
+  { have contra := add_lt_of_lt_and_le
+      ((ne.le_iff_lt hx2).mp (le_of_not_gt h.right))
+      (le_of_not_gt h.left),
+    conv_lhs at contra { rw add_comm },
+    conv_rhs at contra { rw add_comm },
+    exact (ne_of_lt contra) hx1 }
+end
+
+lemma sub_sub' {a b : ℕ} (h : b ≤ a) : a - (a - b) = b :=
+begin
+  rw nat.sub_eq_iff_eq_add (nat.sub_le _ _),
+  rw nat.add_sub_of_le h,
+end
+
 lemma leading_term_nilpotent_of_unit {p : polynomial R}
 (dpos : p.nat_degree > 0) (h : is_unit p) :
   is_nilpotent p.leading_coeff :=
@@ -153,49 +205,107 @@ begin
 
   let n := p.nat_degree,
   let m := q.nat_degree,
-  have h1 : n + m > 0 := sorry,
+  have h1 : n + m > 0 := add_pos_left dpos m,
 
-  have h2 : ∀ r, r ≥ 0 ∧ r ≤ m → p.coeff n ^ (r + 1) * q.coeff (m - r) = 0,
-  { rintro r ⟨hr1, hr2⟩,
-    apply nat.case_strong_induction_on r,
-    { simp,
-      rw polynomial.ext_iff at hpq,
+  have h' : ∑ (x : ℕ × ℕ) in nat.antidiagonal (n + m) \ {(n, m)},
+    p.coeff x.fst * q.coeff x.snd = 0,
+  { apply sum_eq_zero,
+    intros x hx,
+    have ha := antidiagonal_gt_of hx,
+    cases ha;
+    { have := coeff_eq_zero_of_nat_degree_lt ha,
+      rw this, simp } },
+
+  have h2 : ∀ r, r ≤ m → p.coeff n ^ (r + 1) * q.coeff (m - r) = 0,
+  { intros r,
+    rw polynomial.ext_iff at hpq,
+    apply nat.case_strong_induction_on r, clear r,
+
+    { intro _,
+      simp,
+      -- can't use leading_coeff_mul because it assumes R is an integral domain :(
       specialize hpq (n + m),
       rw [coeff_mul, coeff_one, if_neg] at hpq,
       { convert hpq,
-        sorry },
-      exact ne_of_lt h1, },
-    { intros k hk,
-      rw polynomial.ext_iff at hpq,
-      specialize hpq (n + m - k.succ),
-      have h : n + m - k.succ > 0 := sorry,
-      rw [coeff_mul, coeff_one, if_neg] at hpq,
-      { sorry },
-      exact ne_of_lt h } },
+        rw [sum_antidiagonal_split, h', zero_add],
+        simp },
+      exact ne_of_lt h1 },
 
-  have h3 : ∀ r, r ≥ 0 ∧ r ≤ m → p.coeff n ^ m.succ * q.coeff (m - r) = 0,
+    { intros i hi him,
+      set d' := n + (m - i.succ) with d'_def,
+      have d'pos : d' > 0 :=
+        calc 0 < n : dpos
+        ... = n + 0 : by rw add_zero
+        ... ≤ n + (m - i.succ) : add_le_add_left (zero_le _) n,
+
+      specialize hpq d',
+      rw [coeff_mul, coeff_one, if_neg] at hpq,
+      swap, exact ne_of_lt d'pos,
+      { have h : ∑ x in nat.antidiagonal d' \ {(n, m - i.succ)},
+          p.coeff n ^ i.succ * (p.coeff x.fst * q.coeff x.snd) = 0,
+        { apply sum_eq_zero,
+          intros x hx,
+
+          by_cases hx' : x.fst > n ∨ x.snd > m,
+          { cases hx',
+              rw [coeff_eq_zero_of_nat_degree_lt hx', zero_mul, mul_zero],
+              rw [coeff_eq_zero_of_nat_degree_lt hx', mul_zero, mul_zero] },
+
+          rw not_or_distrib at hx',
+          replace hx := antidiagonal_gt_of hx,
+          cases hx,
+            rw [coeff_eq_zero_of_nat_degree_lt hx, zero_mul, mul_zero],
+
+          replace hx := add_lt_add_right hx i.succ,
+          rw [nat.sub_add_cancel him, add_succ, lt_succ_iff] at hx,
+          replace hx := nat.sub_le_sub_right hx x.snd,
+          rw nat.add_sub_cancel_left x.snd i at hx,
+          -- hx is now `m - x.snd ≤ i`
+
+          have ha := hi (m - x.snd) hx (nat.sub_le _ _),
+          rw sub_sub' (not_lt.mp hx'.right) at ha,
+
+          have hb : i.succ = (i.succ - (m - x.snd + 1)) + (m - x.snd + 1),
+          { rw nat.sub_add_cancel _,
+            rwa succ_le_succ_iff },
+          rw [hb, pow_add, mul_assoc],
+          conv_lhs { congr, skip, congr, skip, rw mul_comm },
+          conv_lhs { congr, skip, rw ←mul_assoc },
+          rw [ha, zero_mul, mul_zero] },
+
+        replace hpq := mul_left_of_eq (p.coeff n ^ i.succ) hpq,
+        rw [mul_sum, mul_zero, sum_antidiagonal_split] at hpq,
+        dsimp only at hpq,
+        rw [h, zero_add] at hpq,
+        convert hpq using 1,
+        rw [←mul_assoc, pow_add, pow_one] } } },
+
+  have h3 : ∀ r, r ≤ m → p.coeff n ^ m.succ * q.coeff (m - r) = 0,
   { intros r hr,
     have h := h2 r hr,
-    have : ∀ (a b c : R), a = b → c * a = c * b :=
-      by { intros a b c h, rw h },
-    replace h := this _ _ (p.coeff n ^ (m + 1 - r.succ)) h,
+    replace h := mul_left_of_eq (p.coeff n ^ (m + 1 - r.succ)) h,
     have ha : m.succ - r.succ + r.succ = m.succ :=
-      nat.sub_add_cancel (nat.succ_le_succ_iff.mpr hr.right),
+      nat.sub_add_cancel (succ_le_succ_iff.mpr hr),
     rwa [←mul_assoc, mul_zero, ←pow_add, ha] at h },
 
   have h4 : p.coeff n ^ m.succ * eval 1 q = 0,
-  { rw [eval_eq_finset_sum, mul_sum], simp,
+  { rw [eval_eq_finset_sum, mul_sum],
     convert finset.sum_const_zero,
-    ext i,
-    by_cases hi : i ≥ 0 ∧ i ≤ m,
-    sorry },
+    ext i, rw [one_pow, mul_one],
+    by_cases hi : i ≤ m,
+    { have := h3 (m - i) (nat.sub_le _ _),
+      rwa sub_sub' hi at this },
+    { rw [coeff_eq_zero_of_nat_degree_lt (not_le.mp hi), mul_zero] } },
 
-  have h5 : is_unit (eval 1 p) := sorry,
+  have h5 : p.coeff n ^ m.succ = 0,
+  { have ha : eval 1 q * eval 1 p = 1 :=
+      by rw [←eval_mul, mul_comm, hpq, eval_one],
+    -- I hope there's a simpler way
+    have hb : p.coeff n ^ m.succ * eval 1 q * eval 1 p = 0 * eval 1 p :=
+      congr_fun (congr_arg has_mul.mul h4) (eval 1 p),
+    rwa [mul_assoc, ha, mul_one, zero_mul] at hb },
 
-  have h6 : p.coeff n ^ m.scc = 0 :=
-   by rw [←mul_one (p.coeff n ^ m.succ), ←is_unit.mul_coe_inv h5,
-          ←mul_assoc, h4, zero_mul],
-  use m, convert h6,
+  use m.succ, convert h5
 end
 
 theorem ex1_2i (p : polynomial R) :
@@ -220,7 +330,7 @@ begin
         replace h1 := eq.symm h1,
         rw [←p'_def, ←eq_add_neg_iff_add_eq] at h1,
 
-        have dpos := nat.pos_of_ne_zero (nat.succ_ne_zero i),
+        have dpos := nat.pos_of_ne_zero (succ_ne_zero i),
         rw ←hd at dpos,
 
         have h2 : is_nilpotent (-(monomial p.nat_degree) p.leading_coeff),
@@ -240,7 +350,7 @@ begin
           
         have h6 : ∀ n, n > 0 → is_nilpotent (p'.coeff n),
         { intros n npos,
-          rw [hd, nat.lt_succ_iff] at h5,
+          rw [hd, lt_succ_iff] at h5,
           exact hi p'.nat_degree h5 p' h3 n npos rfl },
           
         by_cases hn : n = p.nat_degree,
@@ -262,7 +372,7 @@ begin
       use C inv, rw [←C_mul, mul_inv], exact C_1 },
 
     { intros i hi p hconst hrest hd,
-      have dpos := nat.pos_of_ne_zero (nat.succ_ne_zero i),
+      have dpos := nat.pos_of_ne_zero (succ_ne_zero i),
       rw ←hd at dpos,
 
       set p' := erase p.nat_degree p with p'_def,
@@ -286,7 +396,7 @@ begin
           rw hb, intro _, exact is_nilpotent.zero },
       
       have h4 : is_unit p',
-      { rw [hd, nat.lt_succ_iff] at h2,
+      { rw [hd, lt_succ_iff] at h2,
         exact hi p'.nat_degree h2 p' hconst' hrest' rfl },
       
       let leading_term := (monomial p.nat_degree) p.leading_coeff,
