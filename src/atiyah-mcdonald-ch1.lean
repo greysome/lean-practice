@@ -1,3 +1,4 @@
+import useful_lemmas
 import algebra.ring.basic
 import algebra.big_operators.basic
 import algebra.group.units
@@ -13,7 +14,7 @@ import tactic
 open finset tactic polynomial nat set
 open_locale big_operators
 
-variables {R : Type} [comm_ring R] [nontrivial R]
+variables {R : Type*} [comm_ring R] [nontrivial R]
 
 /-
 1.1: sum of unit and nilpotent is a unit
@@ -109,50 +110,6 @@ begin
   rwa [mul_coeff_zero, coeff_one_zero] at hpq
 end
 
-lemma erase_const_eq {p : polynomial R} (dpos : p.nat_degree > 0) :
-  (p.erase p.nat_degree).coeff 0 = p.coeff 0 :=
-begin
-  rw [coeff_erase, if_neg],
-  exact ne_iff_lt_or_gt.mpr (or.inl dpos)
-end
-
-lemma nat_degree_erase_lt {p : polynomial R}
-(dpos : p.nat_degree > 0) (hp : is_unit ((p.erase p.nat_degree).coeff 0)) :
-  (p.erase p.nat_degree).nat_degree < p.nat_degree :=
-begin
-  set p' := p.erase p.nat_degree with p'_def,
-
-  have h1 : p' ≠ 0,
-  { by_contra h,
-    rw polynomial.ext_iff at h,
-    specialize h 0,
-    rw coeff_zero at h,
-    rw h at hp,
-    exact not_is_unit_zero hp },
-  
-  have h2 : p'.degree < p.degree :=
-    degree_erase_lt (ne_zero_of_nat_degree_gt dpos),
-  rwa ←nat_degree_lt_nat_degree_iff h1 at h2,
-end
-
-lemma erase_add_leading_term (p : polynomial R) :
-  p = p.erase p.nat_degree + (monomial p.nat_degree) p.leading_coeff :=
-begin
-  conv_lhs { rw ←(monomial_add_erase p p.nat_degree) },
-  rw [add_comm, add_right_inj],
-  refl,
-end
-
-lemma add_lt_of_lt_and_le {a b c d : ℕ} (h1 : a < b) (h2 : c ≤ d) :
-  a + c < b + d :=
-begin
-  calc a + c < b + c : add_lt_add_right h1 c
-  ... ≤ b + d : add_le_add_left h2 b,
-end
-
-lemma mul_left_of_eq {a b : R} (c : R) (h : a = b) : c * a = c * b :=
-  by { rw h }
-
 lemma sum_antidiagonal_split {a b : ℕ} {f : ℕ × ℕ → R} :
   ∑ (x : ℕ × ℕ) in nat.antidiagonal (a + b), f x =
   ∑ x in nat.antidiagonal (a + b) \ {(a, b)}, f x + f (a, b) :=
@@ -188,10 +145,6 @@ begin
     exact (ne_of_lt contra) hx1 }
 end
 
-lemma sub_sub' {a b : ℕ} (h : b ≤ a) : a - (a - b) = b :=
-  by { rw [nat.sub_eq_iff_eq_add (nat.sub_le _ _),
-            nat.add_sub_of_le h] }
-
 lemma leading_term_nilpotent_of_unit {p : polynomial R}
 (dpos : p.nat_degree > 0) (h : is_unit p) :
   is_nilpotent p.leading_coeff :=
@@ -203,28 +156,15 @@ begin
   let m := q.nat_degree,
   have nmpos : n + m > 0 := add_pos_left dpos m,
 
-  have h1 : ∑ (x : ℕ × ℕ) in nat.antidiagonal (n + m) \ {(n, m)},
-    p.coeff x.fst * q.coeff x.snd = 0,
-  { apply sum_eq_zero,
-    intros x hx,
-    have ha := antidiagonal_gt_of hx,
-    cases ha;
-    { have := coeff_eq_zero_of_nat_degree_lt ha,
-      rw this, simp } },
-
-  have h2 : ∀ r, r ≤ m → p.coeff n ^ (r + 1) * q.coeff (m - r) = 0,
+  have h1 : ∀ r, r ≤ m → p.coeff n ^ (r + 1) * q.coeff (m - r) = 0,
   { intros r,
     rw polynomial.ext_iff at hpq,
     apply nat.case_strong_induction_on r, clear r,
 
-    { intro _,
-      simp,
-      -- can't use leading_coeff_mul because it assumes R is an integral domain :(
+    { intro _, simp,
+      rw ←coeff_mul_degree_add_degree,
       specialize hpq (n + m),
-      rw [coeff_mul, coeff_one, if_neg] at hpq,
-      { convert hpq,
-        rw [sum_antidiagonal_split, h1, zero_add],
-        simp },
+      rwa [coeff_one, if_neg] at hpq,
       exact ne_of_lt nmpos },
 
     { intros i hi him,
@@ -234,6 +174,7 @@ begin
         ... = n + 0 : by rw add_zero
         ... ≤ n + (m - i.succ) : add_le_add_left (zero_le _) n,
 
+      -- Spaghetti code warning
       specialize hpq d',
       rw [coeff_mul, coeff_one, if_neg] at hpq,
       swap, exact ne_of_lt d'pos,
@@ -276,168 +217,153 @@ begin
         convert hpq using 1,
         rw [←mul_assoc, pow_add, pow_one] } } },
 
-  have h3 : ∀ r, r ≤ m → p.coeff n ^ m.succ * q.coeff (m - r) = 0,
+  have h2 : ∀ r, r ≤ m → p.coeff n ^ m.succ * q.coeff (m - r) = 0,
   { intros r hr,
-    have h := h2 r hr,
+    have h := h1 r hr,
     replace h := mul_left_of_eq (p.coeff n ^ (m + 1 - r.succ)) h,
     have ha : m.succ - r.succ + r.succ = m.succ :=
       nat.sub_add_cancel (succ_le_succ_iff.mpr hr),
     rwa [←mul_assoc, mul_zero, ←pow_add, ha] at h },
 
-  have h4 : p.coeff n ^ m.succ * eval 1 q = 0,
+  have h3 : p.coeff n ^ m.succ * eval 1 q = 0,
   { rw [eval_eq_finset_sum, mul_sum],
     convert finset.sum_const_zero,
     ext i, rw [one_pow, mul_one],
     by_cases hi : i ≤ m,
-    { have := h3 (m - i) (nat.sub_le _ _),
+    { have := h2 (m - i) (nat.sub_le _ _),
       rwa sub_sub' hi at this },
     { rw [coeff_eq_zero_of_nat_degree_lt (not_le.mp hi), mul_zero] } },
 
-  have h5 : p.coeff n ^ m.succ = 0,
+  have h4 : p.coeff n ^ m.succ = 0,
   { have ha : eval 1 q * eval 1 p = 1 :=
       by rw [←eval_mul, mul_comm, hpq, eval_one],
-    -- I hope there's a simpler way
-    have hb : p.coeff n ^ m.succ * eval 1 q * eval 1 p = 0 * eval 1 p :=
-      congr_fun (congr_arg has_mul.mul h4) (eval 1 p),
+    have hb := mul_right_of_eq (eval 1 p) h3,
     rwa [mul_assoc, ha, mul_one, zero_mul] at hb },
 
-  use m.succ, convert h5
+  use m.succ, convert h4
 end
 
-lemma polynomial_nat_degree_strong_induction {P : polynomial R → Prop}
-  (p : polynomial R)
-  (h : ∀ (p : polynomial R) (n : ℕ),
-    (∀ (m : ℕ), m < n →
-      (∀ (p' : polynomial R), p'.nat_degree = m → P p')) →
-        p.nat_degree = n → P p) :
-  P p :=
-begin
-  generalize hd : p.nat_degree = d,
-  revert hd p,
-  apply nat.strong_induction_on d, clear d,
-  intros n h' p,
-  exact h p n h',
-end
-
-lemma polynomial_nat_degree_case_strong_induction {P : polynomial R → Prop}
-  (p : polynomial R)
-  (hz : ∀ (p : polynomial R), p.nat_degree = 0 → P p)
-  (hi : ∀ (p : polynomial R) (n : ℕ),
-    (∀ (m : ℕ), m ≤ n →
-      (∀ (p' : polynomial R), p'.nat_degree = m → P p')) →
-        p.nat_degree = n.succ → P p) :
-  P p :=
-begin
-  generalize hd : p.nat_degree = d,
-  revert hd p,
-  apply nat.case_strong_induction_on d, clear d,
-  { exact hz },
-  { intros n h p, exact hi p n h }
-end
+lemma monomial_nilpotent_of_nilpotent {r : R} (h : is_nilpotent r) (n : ℕ) :
+  is_nilpotent ((monomial n) r) :=
+by { obtain ⟨n, hn⟩ := h, use n, rwa [monomial_pow, monomial_eq_zero_iff] }
 
 theorem polynomial_unit_iff (p : polynomial R) :
   is_unit p ↔ is_unit (p.coeff 0) ∧ ∀ (n : ℕ), n > 0 → is_nilpotent (p.coeff n) :=
 begin
   split,
   { intro hp, split,
-      exact is_unit_const_of_unit hp,
+    { exact is_unit_const_of_unit hp },
 
     revert hp,
-    apply polynomial_nat_degree_case_strong_induction p,
-    { clear p, intros p hd hp n npos,
+    induction hd : p.nat_degree using nat.case_strong_induction_on with i hi generalizing p,
+    { intros hp n npos,
       rw coeff_eq_zero_of_nat_degree_lt _,
       exact is_nilpotent.zero, rwa hd },
 
-    { clear p, intros p i hi hd hp n npos,
-      set p' := erase p.nat_degree p with p'_def,
-      have h1 := erase_add_leading_term p,
-      replace h1 := eq.symm h1,
-      rw [←p'_def, ←eq_add_neg_iff_add_eq] at h1,
+    { intros hp n npos,
+      set p' := p.erase p.nat_degree with p'_def,
 
       have dpos := nat.pos_of_ne_zero (succ_ne_zero i),
       rw ←hd at dpos,
 
-      have h2 : is_nilpotent (-(monomial p.nat_degree) p.leading_coeff),
-      { obtain ⟨n, hn⟩ := leading_term_nilpotent_of_unit dpos hp,
-        use n,
-        rw [←monomial_neg, monomial_pow, monomial_eq_zero_iff],
-        rw [neg_eq_neg_one_mul, mul_pow, hn, mul_zero] },
+      have h1 := unit_of_unit_plus_nilpotent hp
+        (is_nilpotent.neg
+          (monomial_nilpotent_of_nilpotent
+            (leading_term_nilpotent_of_unit dpos hp) p.nat_degree)),
+      rw ←(erase_eq_orig_sub_leading_term p) at h1,
 
-      have h3 := unit_of_unit_plus_nilpotent hp h2,
-      rw ←h1 at h3,
-
-      have h4 : is_unit (p'.coeff 0) :=
-        by { rw erase_const_eq dpos, exact is_unit_const_of_unit hp },
-
-      have h5 : p'.nat_degree < p.nat_degree :=
-        nat_degree_erase_lt dpos h4,
+      have h2 : p'.nat_degree < p.nat_degree := erase_nat_degree_lt dpos,
         
-      have h6 : ∀ n, n > 0 → is_nilpotent (p'.coeff n),
+      have h3 : ∀ n, n > 0 → is_nilpotent (p'.coeff n),
       { intros n npos,
-        rw [hd, lt_succ_iff] at h5,
-        exact hi p'.nat_degree h5 p' rfl h3 n npos,},
+        rw [hd, lt_succ_iff] at h2,
+        exact hi p'.nat_degree h2 p' rfl h1 n npos,},
         
       by_cases hn : n = p.nat_degree,
       { convert (leading_term_nilpotent_of_unit dpos hp) },
-      { specialize h6 n npos,
-        convert h6 using 1,
+      { specialize h3 n npos,
+        convert h3 using 1,
         rwa [coeff_erase, if_neg] } } },
 
-  { apply polynomial_nat_degree_case_strong_induction p,
-    { clear p,
-      rintro p hd ⟨hconst, -⟩,
+  { induction hd : p.nat_degree using nat.case_strong_induction_on with i hi generalizing p,
+    { rintro ⟨hconst, -⟩,
       rw is_unit_iff_exists_inv at ⊢ hconst,
       obtain ⟨inv, mul_inv⟩ := hconst,
       rw eq_C_of_nat_degree_eq_zero hd,
       use C inv, rw [←C_mul, mul_inv], exact C_1 },
 
-    { clear p,
-      rintro p i hi hd ⟨hconst, hrest⟩,
+    { rintro ⟨hconst, hrest⟩,
       have dpos := nat.pos_of_ne_zero (succ_ne_zero i),
       rw ←hd at dpos,
 
-      set p' := erase p.nat_degree p with p'_def,
+      set p' := p.erase p.nat_degree with p'_def,
 
-      have h1 := erase_const_eq dpos,
-      have hconst' : is_unit (p'.coeff 0) := by { rw h1, exact hconst },
+      have h1 : p'.nat_degree < p.nat_degree := erase_nat_degree_lt dpos,
 
-      have h2 : p'.nat_degree < p.nat_degree :=
-        nat_degree_erase_lt dpos hconst',
-
-      have h3 : ∀ n, p'.coeff n = p.coeff n ∨ p'.coeff n = 0,
-      { intro n,
-        rw coeff_erase,
-        by_cases hn : n = p.nat_degree,
-        { rw if_pos, right, refl, assumption },
-        { rw if_neg, left, refl, assumption } },
-
+      have hconst' : is_unit (p'.coeff 0) := 
+        by { rw (erase_const_eq dpos), exact hconst },
       have hrest' : ∀ n, n > 0 → is_nilpotent (p'.coeff n),
-      { intro n, cases h3 n with ha hb,
-          rw ha, exact hrest n,
-          rw hb, intro _, exact is_nilpotent.zero },
+      { intro n, cases erase_coeff_eq_orig_or_zero p n with ha hb,
+          rw ha, intro _, exact is_nilpotent.zero,
+          rw hb, exact hrest n },
       
-      have h4 : is_unit p',
-      { rw [hd, lt_succ_iff] at h2,
-        exact hi p'.nat_degree h2 p' rfl ⟨hconst', hrest'⟩ },
+      have h2 : is_unit p',
+      { rw [hd, lt_succ_iff] at h1,
+        exact hi p'.nat_degree h1 p' rfl ⟨hconst', hrest'⟩ },
       
       let leading_term := (monomial p.nat_degree) p.leading_coeff,
-      have h5 : is_nilpotent leading_term,
+      have h3 : is_nilpotent leading_term,
       { obtain ⟨n, hn⟩ := hrest p.nat_degree dpos,
         use n, rw [monomial_pow, monomial_eq_zero_iff], convert hn },
 
-      rw [erase_add_leading_term p, ←p'_def],
-      exact unit_of_unit_plus_nilpotent h4 h5 } }
+      rw [orig_eq_erase_add_leading_term p, ←p'_def],
+      exact unit_of_unit_plus_nilpotent h2 h3 } }
 end
 
-theorem ex1_2ii (p : polynomial R) :
-  is_nilpotent p ↔ ∀ (n : ℕ), is_nilpotent (p.coeff n) :=
+lemma leading_term_nilpotent_of_nilpotent {p : polynomial R} (h : is_nilpotent p) :
+  is_nilpotent p.leading_coeff :=
 begin
   sorry
 end
 
+theorem polynomial_nilpotent_iff (p : polynomial R) :
+  is_nilpotent p ↔ ∀ (n : ℕ), is_nilpotent (p.coeff n) :=
+begin
+  split,
+  { induction hd : p.nat_degree using nat.strong_induction_on with i hi generalizing p,
+    intros hp n,
+    dsimp at hi, subst hd,
+    cases const_or_erase_nat_degree_lt p with h,
+
+    { by_cases hn : n = 0,
+      { rw [hn, ←h], exact leading_term_nilpotent_of_nilpotent hp },
+      { change n ≠ 0 at hn, rw [←pos_iff_ne_zero, ←h] at hn,
+        rw coeff_eq_zero_of_nat_degree_lt hn,
+        exact is_nilpotent.zero }},
+
+    { set p' := p.erase p.nat_degree with p'_def, rw ←p'_def at *,
+
+      have hp' := hi p'.nat_degree h p' rfl,
+      have h1 := leading_term_nilpotent_of_nilpotent hp,
+      have h2 := commute.is_nilpotent_add _ hp
+        (is_nilpotent.neg
+          (monomial_nilpotent_of_nilpotent h1 p.nat_degree)),
+      rw ←erase_eq_orig_sub_leading_term p at h2,
+
+      apply reduce_to_erase n,
+      { exact h1 },
+      { exact hp' h2 },
+      -- very hacky, figure out how to remove this
+      exact _inst_2,
+      unfold commute, unfold semiconj_by, ring } },
+
+  -- the hard part
+  { sorry }
+end
+
 def is_zero_divisor (a : R) : Prop := a ≠ 0 ∧ ∃ b, b ≠ 0 ∧ a * b = 0
 
-theorem ex1_2iii (p : polynomial R) :
+theorem polynomial_zero_divisor_iff (p : polynomial R) :
   is_zero_divisor p ↔ ∃ (a : R), a ≠ 0 ∧ a • p = 0 :=
 sorry
 
