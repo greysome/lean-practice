@@ -33,7 +33,7 @@ begin
   sorry
 end
 
-lemma const_or_erase_nat_degree_lt (p : polynomial R) :
+lemma erase_nat_degree_lt_or_zero (p : polynomial R) :
   p.nat_degree = 0 ∨ (p.erase p.nat_degree).nat_degree < p.nat_degree :=
 begin
   by_cases hd : p.nat_degree = 0,
@@ -87,4 +87,38 @@ begin
   by_cases hn : n = p.nat_degree,
   { convert h1 },
   { rw ←erase_coeff_eq_orig hn, exact h2 n }
+end
+
+lemma nat_degree_pow_le (p : polynomial R) (n : ℕ) :
+  (p ^ n).nat_degree ≤ n * p.nat_degree :=
+begin
+  induction n with i hi,
+  { simp },
+  { rw [pow_succ, succ_mul, add_comm],
+    calc (p * p ^ i).nat_degree ≤ p.nat_degree + (p ^ i).nat_degree : nat_degree_mul_le
+    ... ≤ p.nat_degree + i * p.nat_degree : nat.add_le_add_left hi _ }
+end
+
+lemma coeff_pow_degree_mul_degree (p : polynomial R) (n : ℕ) :
+  (p ^ n).coeff (n * p.nat_degree) = p.leading_coeff ^ n :=
+begin
+  induction n with i hi,
+  { simp },
+  { by_cases h : p.leading_coeff ^ i = 0; repeat { rw pow_succ' },
+    { by_cases hp : p ^ i = 0; rw [h, zero_mul],
+      { rw [hp, zero_mul, coeff_zero] },
+      { have h1 : (p ^ i).nat_degree < i * p.nat_degree,
+        { by_contra h',
+          replace h' := eq_iff_le_not_lt.mpr ⟨nat_degree_pow_le p i, h'⟩,
+          rw [←h', h] at hi,
+          exact (leading_coeff_ne_zero.mpr hp) hi },
+
+        have h2 : (p ^ i * p).nat_degree < i.succ * p.nat_degree,
+          calc (p ^ i * p).nat_degree ≤ (p ^ i).nat_degree + p.nat_degree : nat_degree_mul_le
+          ... <  i * p.nat_degree + p.nat_degree : nat.add_lt_add_right h1 _
+          ... = i.succ * p.nat_degree : by rw ←succ_mul,
+        rw coeff_eq_zero_of_nat_degree_lt h2 } },
+
+    { rw [succ_mul, ←nat_degree_pow' h, ←leading_coeff_pow' h],
+      exact coeff_mul_degree_add_degree _ _ } }
 end

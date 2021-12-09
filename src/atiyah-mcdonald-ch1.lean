@@ -277,7 +277,7 @@ begin
       have h3 : ∀ n, n > 0 → is_nilpotent (p'.coeff n),
       { intros n npos,
         rw [hd, lt_succ_iff] at h2,
-        exact hi p'.nat_degree h2 p' rfl h1 n npos,},
+        exact hi p'.nat_degree h2 p' rfl h1 n npos },
         
       by_cases hn : n = p.nat_degree,
       { convert (leading_term_nilpotent_of_unit dpos hp) },
@@ -323,7 +323,11 @@ end
 lemma leading_term_nilpotent_of_nilpotent {p : polynomial R} (h : is_nilpotent p) :
   is_nilpotent p.leading_coeff :=
 begin
-  sorry
+  obtain ⟨n, hn⟩ := h,
+  use n,
+  rw ←coeff_pow_degree_mul_degree p n,
+  rw polynomial.ext_iff at hn,
+  exact hn _,
 end
 
 theorem polynomial_nilpotent_iff (p : polynomial R) :
@@ -333,7 +337,7 @@ begin
   { induction hd : p.nat_degree using nat.strong_induction_on with i hi generalizing p,
     intros hp n,
     dsimp at hi, subst hd,
-    cases const_or_erase_nat_degree_lt p with h,
+    cases erase_nat_degree_lt_or_zero p with h,
 
     { by_cases hn : n = 0,
       { rw [hn, ←h], exact leading_term_nilpotent_of_nilpotent hp },
@@ -342,10 +346,9 @@ begin
         exact is_nilpotent.zero }},
 
     { set p' := p.erase p.nat_degree with p'_def, rw ←p'_def at *,
-
       have hp' := hi p'.nat_degree h p' rfl,
       have h1 := leading_term_nilpotent_of_nilpotent hp,
-      have h2 := commute.is_nilpotent_add _ hp
+      have h2 := commute.is_nilpotent_add (by exact comm_ring.mul_comm _ _) hp
         (is_nilpotent.neg
           (monomial_nilpotent_of_nilpotent h1 p.nat_degree)),
       rw ←erase_eq_orig_sub_leading_term p at h2,
@@ -354,11 +357,29 @@ begin
       { exact h1 },
       { exact hp' h2 },
       -- very hacky, figure out how to remove this
-      exact _inst_2,
-      unfold commute, unfold semiconj_by, ring } },
+      exact _inst_2 } },
 
-  -- the hard part
-  { sorry }
+  { induction hd : p.nat_degree using nat.strong_induction_on with i hi generalizing p,
+    intros hp,
+    dsimp at hi, subst hd,
+    cases erase_nat_degree_lt_or_zero p with h,
+
+    { replace h := eq_C_of_nat_degree_eq_zero h, rw h,
+      obtain ⟨n, hn⟩ := hp 0,
+      use n, rw [←C_pow, hn, C_eq_zero] },
+
+    { set p' := p.erase p.nat_degree with p'_def, rw ←p'_def at *,
+      have h1 : ∀ n, is_nilpotent (p'.coeff n),
+      { intro n,
+        cases erase_coeff_eq_orig_or_zero p n with h' h'; rw h',
+        { exact is_nilpotent.zero },
+        { exact hp n } },
+      have h2 := hi p'.nat_degree h p' rfl h1,
+      have h3 : is_nilpotent (monomial p.nat_degree p.leading_coeff) :=
+        monomial_nilpotent_of_nilpotent (hp p.nat_degree) _,
+
+      rw orig_eq_erase_add_leading_term p,
+      exact commute.is_nilpotent_add (by exact comm_ring.mul_comm _ _) h2 h3 } }
 end
 
 def is_zero_divisor (a : R) : Prop := a ≠ 0 ∧ ∃ b, b ≠ 0 ∧ a * b = 0
@@ -367,6 +388,6 @@ theorem polynomial_zero_divisor_iff (p : polynomial R) :
   is_zero_divisor p ↔ ∃ (a : R), a ≠ 0 ∧ a • p = 0 :=
 sorry
 
-theorem ex1_2iv (p q : polynomial R) :
+theorem polynomial_primitive_mul_iff (p q : polynomial R) :
   (p * q).is_primitive ↔ p.is_primitive ∧ q.is_primitive :=
 sorry
