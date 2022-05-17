@@ -270,7 +270,7 @@ begin
         (is_nilpotent.neg
           (monomial_nilpotent_of_nilpotent
             (leading_term_nilpotent_of_unit dpos hp) p.nat_degree)),
-      rw ←(erase_eq_orig_sub_leading_term p) at h1,
+      rw ←orig_sub_monomial p at h1,
 
       have h2 : p'.nat_degree < p.nat_degree := erase_nat_degree_lt dpos,
         
@@ -316,7 +316,7 @@ begin
       { obtain ⟨n, hn⟩ := hrest p.nat_degree dpos,
         use n, rw [monomial_pow, monomial_eq_zero_iff], convert hn },
 
-      rw [orig_eq_erase_add_leading_term p, ←p'_def],
+      rw [←monomial_add_erase p p.nat_degree, ←p'_def, add_comm],
       exact unit_of_unit_plus_nilpotent h2 h3 } }
 end
 
@@ -351,7 +351,7 @@ begin
       have h2 := commute.is_nilpotent_add (by exact comm_ring.mul_comm _ _) hp
         (is_nilpotent.neg
           (monomial_nilpotent_of_nilpotent h1 p.nat_degree)),
-      rw ←erase_eq_orig_sub_leading_term p at h2,
+      rw ←orig_sub_monomial p at h2,
 
       apply reduce_to_erase n,
       { exact h1 },
@@ -378,8 +378,8 @@ begin
       have h3 : is_nilpotent (monomial p.nat_degree p.leading_coeff) :=
         monomial_nilpotent_of_nilpotent (hp p.nat_degree) _,
 
-      rw orig_eq_erase_add_leading_term p,
-      exact commute.is_nilpotent_add (by exact comm_ring.mul_comm _ _) h2 h3 } }
+      rw ←monomial_add_erase p p.nat_degree,
+      exact commute.is_nilpotent_add (by exact comm_ring.mul_comm _ _) h3 h2 } }
 end
 
 def is_zero_divisor (a : R) : Prop := a ≠ 0 ∧ ∃ b, b ≠ 0 ∧ a * b = 0

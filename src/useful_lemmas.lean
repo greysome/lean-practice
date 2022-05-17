@@ -51,19 +51,10 @@ begin
   exact ne_iff_lt_or_gt.mpr (or.inl dpos)
 end
 
-lemma orig_eq_erase_add_leading_term (p : polynomial R) :
-  p = p.erase p.nat_degree + (monomial p.nat_degree) p.leading_coeff :=
-begin
-  conv_lhs { rw ←(monomial_add_erase p p.nat_degree) },
-  rw [add_comm, add_right_inj],
-  refl,
-end
-
-lemma erase_eq_orig_sub_leading_term (p : polynomial R) :
+lemma orig_sub_monomial (p : polynomial R) :
   p.erase p.nat_degree = p + -(monomial p.nat_degree) p.leading_coeff :=
 begin
-  have h := orig_eq_erase_add_leading_term p,
-  conv_rhs { congr, rw h },
+  conv_rhs { congr, rw ←(monomial_add_erase p p.nat_degree) },
   simp,
 end
 
