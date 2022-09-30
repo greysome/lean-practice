@@ -7,43 +7,19 @@ import algebra.big_operators.intervals
 import ring_theory.algebraic
 import ring_theory.int.basic
 
--- A bunch of basic lemmas that really should be in `mathlib`
-namespace int
-theorem pos_of_pos_nat {n : ℕ} (h : n > 0) : (↑n : ℤ) > 0 :=
-  nat.succ_pred_eq_of_pos h ▸ int.coe_succ_pos n.pred
-end int
+-- This code is a perfect example of how *NOT* to use Lean
+-- There are some `sorry`s because I attempted to refactor my old code
+-- to make it more idiomatic, but I just gave up halfway...
 
 namespace rat
-theorem pow_def (a b : ℤ) (b0 : b ≠ 0) (n : ℕ) :
-  rat.mk a b ^ n = rat.mk (a ^ n) (b ^ n) :=
-begin
-  induction n with i hi,
-    simp,
-  repeat {rw pow_succ},
-  rwa [hi, rat.mul_def],
-  exact pow_ne_zero i b0
-end
+theorem pow_num_denom (q : ℚ) (n : ℕ) : q ^ n = rat.mk (q.num ^ n) (↑q.denom ^ n) :=
+sorry
 
-theorem eq_mk (r : ℚ) : r = rat.mk r.num r.denom :=
-begin
-  have coprime : r.num.gcd r.denom = 1 := (int.gcd_eq_one_iff_coprime.mpr $
-    int.coprime_iff_nat_coprime.mpr $
-    show r.num.nat_abs.coprime (↑r.denom : ℤ).nat_abs,
-      from (int.nat_abs_of_nat r.denom) ▸ r.cop),
-  have denompos : (↑r.denom : ℤ) > 0 := int.pos_of_pos_nat r.pos,
-  have denomsign : (↑r.denom : ℤ).sign = 1 := int.sign_eq_one_of_pos denompos,
-  ext,
-    rw [rat.num_mk, coprime, denomsign],
-    simp,
-  rw [rat.denom_mk, if_neg $ ne_of_gt denompos, coprime],
-  simp
-end
+theorem div_mk_div_cancel_right {a b c : ℤ} (c0 : c ≠ 0) :
+  rat.mk (c * a) (c * b) = rat.mk a b :=
+by rw [mul_comm c a, mul_comm c b, rat.div_mk_div_cancel_left c0]
 
-theorem mk_mul_num_and_denom {a b c : ℤ} (hb : b ≠ 0) (hc : c ≠ 0) :
-  rat.mk a b = rat.mk (c * a) (c * b) :=
-by rw [rat.mk_eq hb $ mul_ne_zero hc hb, ←mul_assoc a _ _, mul_comm a c]
-
-theorem sum_same_denom {n : ℕ} (num : fin (n + 1) → ℤ) (denom : ℤ) :
+theorem sum_same_denom {n : ℕ} {num : fin (n + 1) → ℤ} {denom : ℤ} :
   finset.univ.sum (λ x : fin (n + 1), rat.mk (num x) denom) =
   rat.mk (finset.univ.sum (λ x : fin (n + 1), num x)) denom := by {
   induction n with i hi,
@@ -59,33 +35,45 @@ end rat
 theorem int_of_algebraic_rat (r : ℚ) (hr : is_integral ℤ r) : r.denom = 1 :=
 begin
   obtain ⟨p, hp1, hp2⟩ := hr,
-
-  by_cases p.nat_degree = 0,
-  { rw [polynomial.eq_C_of_nat_degree_eq_zero h, polynomial.eval₂_C,
-      algebra_map_int_eq, ring_hom.eq_int_cast, rat.coe_int_eq_mk,
-      rat.mk_eq_zero one_ne_zero, ←h, polynomial.monic.coeff_nat_degree hp1]
-      at hp2,
-    exact false.elim (one_ne_zero hp2) },
-
-  -- This is painful
-  rw [polynomial.eval₂_eq_sum,
-    polynomial.sum_over_range, -- generates an intermediate goal...
-    ←fin.sum_univ_eq_sum_range,
-    rat.eq_mk r]
-    at hp2,
-  simp_rw [rat.pow_def r.num ↑r.denom $ ne_of_gt $ int.pos_of_pos_nat r.pos]
-    at hp2,
-
-  swap, -- ...which we immediately handle
-    intro n, simp,
-
   set n := p.nat_degree with hn,
   set P := r.num with hP,
   set Q : ℤ := ↑r.denom with hQ,
-  simp_rw [algebra_map_int_eq, ring_hom.eq_int_cast, rat.coe_int_eq_mk] at hp2,
 
-  have Qpow : ∀ n : ℕ, Q ^ n ≠ 0 :=
-    λ n, pow_ne_zero n $ ne_of_gt $ int.pos_of_pos_nat $ hQ.symm ▸ r.pos,
+  by_cases p.nat_degree = 0,
+  { rw [polynomial.eq_C_of_nat_degree_eq_zero h,
+      polynomial.eval₂_C,
+      algebra_map_int_eq,
+      ring_hom.eq_int_cast,
+      rat.coe_int_eq_mk,
+      rat.mk_eq_zero one_ne_zero,
+      ←h,
+      polynomial.monic.coeff_nat_degree hp1]
+      at hp2,
+    exact false.elim (one_ne_zero hp2) },
+
+  have Qpow : ∀ n : ℕ, Q ^ n ≠ 0 := sorry,
+  rw [polynomial.eval₂_eq_sum,
+    polynomial.sum_over_range, -- generates an intermediate goal...
+    ←fin.sum_univ_eq_sum_range]
+    at hp2,
+  simp_rw [algebra_map_int_eq,
+    ring_hom.eq_int_cast,
+    rat.coe_int_eq_mk,
+    rat.pow_num_denom,
+    rat.mul_def one_ne_zero $ Qpow _,
+    one_mul,
+    rat.mk_eq_div] at hp2,
+
+  swap, -- ...which we immediately handle
+  { intro n, simp },
+  
+  have : (λ x : fin (n + 1), ((p.coeff (x : ℕ) * P ^ ↑x) / Q ^ (x : ℕ))) =
+    (λ x : fin (n + 1), ((p.coeff (x : ℕ) * P ^ (x : ℕ) * Q ^ (n -(x : ℕ))) / Q ^ n : ℚ)) := by {
+    funext,
+    calc ((p.coeff ↑x * P ^ ↑x) / Q ^ ↑x : ℚ)
+      = ((p.coeff ↑x * P ^ ↑x * Q ^ (n-↑x)) / (Q ^ ↑x * Q ^ (n-↑x)) : ℚ) : sorry
+    ... = ((p.coeff ↑x * P ^ ↑x * Q ^ (n-↑x)) / Q ^ n : ℚ) : sorry,
+  },
 
   -- Tedious rewriting lemmas
   have h1 : ∀ x : ℕ, x ≤ n → rat.mk (P ^ x) (Q ^ x) =
