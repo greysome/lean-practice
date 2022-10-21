@@ -290,7 +290,7 @@ example {a : α} {f : α → α} {n : ℕ} : nat.iter a f n.succ = f (nat.iter a
 def G (f : ℕ → α → α) : ℕ × α → ℕ × α := λ y, ⟨y.pr₁.succ, f y.pr₁ y.pr₂⟩
 
 -- Name comes from the `zip` function in Python.
--- The function is like zip(ℕ, f).
+-- The function is like zip(ℕ, nat.rec' a f).
 def zip (a : α) (f : ℕ → α → α) : ℕ → ℕ × α :=
 nat.iter ⟨nat.zero, a⟩ (G f)
 
