@@ -42,11 +42,11 @@ let D : Π (a b : α), a = b → Type* :=
 -- Exercise 1.15: indiscernability of identicals (in a sense the recursor)
 -- follows from path induction
 def rec' (P : α → Type*) :
-  Π (a b : α) (p : a = b), P a → P b :=
+  Π {a b : α} (p : a = b), P a → P b :=
 let C := λ (a b : α) (p : a = b), P a → P b in
 Eq.ind C (λ a c, c)
 
-example {P : α → Type*} {a : α} : rec' P a a rfl = id := rfl
+example {P : α → Type*} {a : α} : rec' P (Eq.refl a) = id := rfl
 
 end Eq
 
@@ -128,9 +128,9 @@ infixr ` ⊕ `:34 := sum
 namespace sum
 def rec' : (α → γ) → (β → γ) → α ⊕ β → γ := @sum.rec α β (λ _, γ)
 
-def ind : Π (C : α ⊕ β → Type*),
+def ind (C : α ⊕ β → Type*) :
   (Π (a : α), C (inl a)) → (Π (b : β), C (inr b)) → Π (x : α ⊕ β), C x :=
-λ C c, @sum.rec α β C c
+λ c, @sum.rec α β C c
 
 end sum
 
@@ -200,8 +200,11 @@ infix ` + `:65 := add
 example : double (zero.succ.succ) = zero.succ.succ.succ.succ := rfl
 example : add zero.succ zero.succ.succ = zero.succ.succ.succ := rfl
 
-def le (n m : ℕ) := Σ k, n + k = m
-def lt (n m : ℕ) := Σ (k : ℕ), n + k.succ = m  
+def le (n m : ℕ) := Σ k, k + n = m
+def lt (n m : ℕ) := Σ (k : ℕ), k.succ + n = m  
+
+infix ` < `:50 := lt
+infix ` ≤ `:50 := le
 
 end nat
 
@@ -244,24 +247,20 @@ example {g : Π (a : α), f a → β} {a : α} {b : f a} : sigma.rec₁ g ⟨a, 
 
 -- Exercise 1.3
 def Eq.symm {a b : α} : a = b → b = a :=
-let P := λ x, x = a,
-x := λ p, Eq.rec' P a b p rfl in
-x
--- WHY IS THERE AN ERROR HERE???
--- let P := λ x, x = a in
--- λ p, Eq.rec' P a b p rfl
+let P := λ x, x = a in
+λ p, @Eq.rec' α P a b p rfl
 
 def prod.ind₁ (C : α × β → Type*)
   (c : Π (a : α) (b : β), C ⟨a, b⟩) :
   Π (x : α × β), C x :=
-λ x, Eq.rec' C ⟨x.pr₁, x.pr₂⟩ x x.uniq.symm (c x.pr₁ x.pr₂)
+λ x, Eq.rec' C x.uniq.symm (c x.pr₁ x.pr₂)
 
 -- Full derivation:
--- prod.ind₁ C c ⟨a, b⟩ ≡
--- Eq.rec' C ⟨a, b⟩ ⟨a, b⟩ ⟨a, b⟩.uniq.symm (c a b) ≡
--- Eq.rec' C ⟨a, b⟩ ⟨a, b⟩ rfl (c a b) ≡
--- id (c a b) ≡
--- (c a b).
+-- prod.ind₁ C c ⟨a, b⟩
+-- ≡ Eq.rec' C ⟨a, b⟩ ⟨a, b⟩ ⟨a, b⟩.uniq.symm (c a b)
+-- ≡ Eq.rec' C ⟨a, b⟩ ⟨a, b⟩ rfl (c a b)
+-- ≡ id (c a b)
+-- ≡ (c a b)
 example {C : α × β → Type*}{c : Π (a : α) (b : β), C ⟨a, b⟩}
   {a : α} {b : β} : prod.ind₁ C c ⟨a, b⟩ = c a b :=
 rfl
@@ -275,7 +274,7 @@ sigma.ind C (λ a b, rfl)
 def sigma.ind₁ (C : (Σ (a : α), f a) → Type*)
   (c : Π (a : α) (b : f a), C ⟨a, b⟩) :
   Π (x : Σ (a : α), f a), C x :=
-λ x, Eq.rec' C ⟨x.pr₁, x.pr₂⟩ x x.uniq.symm (c x.pr₁ x.pr₂)
+λ x, Eq.rec' C x.uniq.symm (c x.pr₁ x.pr₂)
 
 example {C : (Σ (a : α), f a) → Type*}
   {c : Π (a : α) (b : f a), C ⟨a, b⟩}
@@ -288,33 +287,97 @@ def nat.iter : α → (α → α) → ℕ → α := λ a f, nat.rec' a (λ n y, 
 example {a : α} {f : α → α} : nat.iter a f nat.zero = a := rfl
 example {a : α} {f : α → α} {n : ℕ} : nat.iter a f n.succ = f (nat.iter a f n) := rfl
 
-def enrich (a : α) (f : ℕ → α → α) : ℕ → ℕ × α :=
-nat.iter ⟨nat.zero, a⟩ (λ y, ⟨y.pr₁.succ, f y.pr₁ y.pr₂⟩)
+def G (f : ℕ → α → α) : ℕ × α → ℕ × α := λ y, ⟨y.pr₁.succ, f y.pr₁ y.pr₂⟩
+
+-- Name comes from the `zip` function in Python.
+-- The function is like zip(ℕ, f).
+def zip (a : α) (f : ℕ → α → α) : ℕ → ℕ × α :=
+nat.iter ⟨nat.zero, a⟩ (G f)
 
 def nat.rec₁ : α → (ℕ → α → α) → ℕ → α :=
-λ a f n, (enrich a f n).pr₂
+λ a f n, (zip a f n).pr₂
 
+-- Full derivation:
+-- nat.rec₁ a f 0
+-- ≡ (zip a f 0).pr₂
+-- ≡ (nat.iter ⟨0, a⟩ (G f) 0).pr₂
+-- ≡ ⟨0, a⟩.pr₂
+-- ≡ a
 example {a : α} {f : ℕ → α → α} : nat.rec₁ a f nat.zero = a := rfl
 
--- This is NOT definitionally true!
-def aux (a : α) (f : ℕ → α → α) (n : ℕ) : enrich a f n = ⟨n, nat.rec' a f n⟩ :=
-let C := λ n, enrich a f n = ⟨n, nat.rec' a f n⟩ in
-nat.ind C rfl _
+-- ProvinG the other computation rule of `nat.rec₁` requires some
+-- intermediate results
+def Eq.ap (f : α → β) {a b : α} (p : a = b) : f a = f b :=
+let C := λ x, f a = f x in
+@Eq.rec' α C _ _ p rfl
 
 def Eq.trans {a b c : α} : a = b → b = c → a = c :=
 let C := λ (x : α), x = c → a = c in
-λ p, Eq.rec' C a b p id
+λ p, Eq.rec' C p id
 
--- Yes.
+-- This is NOT definitionally true, and it must be proven via induction.
+-- Full derivation for the inductive step:
+-- zip a f n.succ
+-- ≡ nat.iter ⟨0, a⟩ G n.succ
+-- ≡ G (nat.iter ⟨0, a⟩ G n)
+-- = G ⟨n, nat.rec' a f n⟩  (this is the non-judGmental equality that needs to proven)
+-- ≡ ⟨n.succ, f n (nat.rec' a f n)⟩
+-- ≡ ⟨n.succ, nat.rec' a f n.succ⟩
+def aux (a : α) (f : ℕ → α → α) (n : ℕ) : zip a f n = ⟨n, nat.rec' a f n⟩ :=
+let C := λ n, zip a f n = ⟨n, nat.rec' a f n⟩ in
+nat.ind C rfl (λ n h, Eq.ap (G f) h) n
+
+-- Full derivation:
+-- nat.rec₁ a f n.succ
+-- ≡ (zip a f n.succ).pr₂
+-- = nat.rec' a f n.succ  (essentially h₁)
+-- ≡ f n (nat.rec' a f n)
+-- = f n (zip a f n).pr₂  (h₂)
+-- ≡ f n (nat.rec₁ a f n)
 example {a : α} {f : ℕ → α → α} {n : ℕ} :
   nat.rec₁ a f n.succ = f n (nat.rec₁ a f n) :=
-let h₁ : (enrich a f n.succ).pr₂ = nat.rec' a f n.succ :=
-  (let C := λ (x : ℕ × α), x.pr₂ = nat.rec' a f n.succ in
-    @Eq.rec' (ℕ × α) C _ _ (aux a f n.succ).symm rfl),
-h₂ : f n (nat.rec' a f n) = f n (enrich a f n).pr₂ :=
-  (let C := λ (x : ℕ × α), f n (nat.rec' a f n) = f n x.pr₂ in
-    @Eq.rec' (ℕ × α) C _ _ (aux a f n).symm rfl) in
+let h₁ : (zip a f n.succ).pr₂ = nat.rec' a f n.succ :=
+  Eq.ap prod.pr₂ (aux a f n.succ),
+h₂ : f n (nat.rec' a f n) = f n (zip a f n).pr₂ :=
+  @Eq.ap (ℕ × α) α (λ x, f n x.pr₂) _ _ (aux a f n).symm in
 Eq.trans h₁ h₂
+
+-- Exercise 1.5
+def sum₁ (α β : Type*) : Type* := Σ (x : bool), bool.rec' α β x
+
+namespace sum₁
+-- idk why α and β have to be explicitly listed as implicit
+def ind {α β : Type*} (C : sum₁ α β → Type*)
+  (c₁ : Π (a : α), C ⟨bool.ff, a⟩)
+  (c₂ : Π (b : β), C ⟨bool.tt, b⟩) :
+  Π (x : sum₁ α β), C x :=
+sigma.ind C (
+  let C' : bool → Type* := λ a, Π (b : bool.rec' α β a), C ⟨a, b⟩ in
+  bool.ind C' c₁ c₂
+)
+
+-- Full derivation:
+-- sum₁.ind C c₁ c₂ ⟨bool.ff, a⟩
+-- ≡ sigma.ind C (bool.ind _ c₁ c₂) ⟨bool.ff, a⟩
+-- ≡ bool.ind _ c₁ c₂ bool.ff a 
+-- ≡ c₁ a
+example {α β : Type*} {C : sum₁ α β → Type*}
+  {c₁ : Π (a : α), C ⟨bool.ff, a⟩}
+  {c₂ : Π (b : β), C ⟨bool.tt, b⟩}
+  {a : α} :
+sum₁.ind C c₁ c₂ ⟨bool.ff, a⟩ = c₁ a := rfl
+
+example {α β : Type*} {C : sum₁ α β → Type*}
+  {c₁ : Π (a : α), C ⟨bool.ff, a⟩}
+  {c₂ : Π (b : β), C ⟨bool.tt, b⟩}
+  {b : β} :
+sum₁.ind C c₁ c₂ ⟨bool.tt, b⟩ = c₂ b := rfl
+
+end sum₁
+
+-- Exercise 1.9
+def fin : ℕ → Type* := λ n, Σ m, m < n
+def fmax : Π (n : ℕ), fin n.succ := λ n, ⟨n, ⟨nat.zero, rfl⟩⟩
 
 -- Exercise 1.10
 namespace nat
@@ -327,3 +390,18 @@ example : ack m.succ zero = ack m zero.succ := rfl
 example : ack m.succ n.succ = ack m (ack m.succ n) := rfl
 
 end nat
+
+-- Exercises 1.11-1.13
+namespace prop
+variables {A B : Type*}
+example : ¬¬¬ A → ¬ A := λ (f : ¬¬ A → empty) a, f (λ g : ¬ A, g a)
+example : A → B → A := λ a b, a
+example : A → ¬¬ A := λ a (f : A → empty), f a
+example : ¬ A ⊕ ¬ B → ¬ (A × B) :=
+  λ p q, sum.rec' (λ hna : ¬ A, hna q.pr₁) (λ hnb : ¬ B, hnb q.pr₂) p
+example : ¬¬ (A ⊕ ¬ A) :=
+  λ (f : A ⊕ ¬ A → empty), f (sum.inr (λ A, f (sum.inl A)))
+
+-- Exercise 1.15: see definition of `Eq.rec`
+
+end prop
