@@ -13,8 +13,6 @@ infix ` = `:50 := Eq
 notation `rfl` := Eq.refl _
 
 namespace Eq
-#check @Eq.rec -- Based path induction
-
 -- Path induction
 def ind (C : Π (a b : α), a = b → Type*)
   (c : Π (a : α), C a a rfl) :
@@ -261,7 +259,7 @@ def prod.ind₁ (C : α × β → Type*)
 -- ≡ Eq.rec' C ⟨a, b⟩ ⟨a, b⟩ rfl (c a b)
 -- ≡ id (c a b)
 -- ≡ (c a b)
-example {C : α × β → Type*}{c : Π (a : α) (b : β), C ⟨a, b⟩}
+example {C : α × β → Type*} {c : Π (a : α) (b : β), C ⟨a, b⟩}
   {a : α} {b : β} : prod.ind₁ C c ⟨a, b⟩ = c a b :=
 rfl
 
@@ -305,7 +303,7 @@ def nat.rec₁ : α → (ℕ → α → α) → ℕ → α :=
 -- ≡ a
 example {a : α} {f : ℕ → α → α} : nat.rec₁ a f nat.zero = a := rfl
 
--- ProvinG the other computation rule of `nat.rec₁` requires some
+-- Proving the other computation rule of `nat.rec₁` requires some
 -- intermediate results
 def Eq.ap (f : α → β) {a b : α} (p : a = b) : f a = f b :=
 let C := λ x, f a = f x in
@@ -320,7 +318,7 @@ let C := λ (x : α), x = c → a = c in
 -- zip a f n.succ
 -- ≡ nat.iter ⟨0, a⟩ G n.succ
 -- ≡ G (nat.iter ⟨0, a⟩ G n)
--- = G ⟨n, nat.rec' a f n⟩  (this is the non-judGmental equality that needs to proven)
+-- = G ⟨n, nat.rec' a f n⟩  (this is the non-judgmental equality that needs to proven)
 -- ≡ ⟨n.succ, f n (nat.rec' a f n)⟩
 -- ≡ ⟨n.succ, nat.rec' a f n.succ⟩
 def aux (a : α) (f : ℕ → α → α) (n : ℕ) : zip a f n = ⟨n, nat.rec' a f n⟩ :=
@@ -343,10 +341,12 @@ h₂ : f n (nat.rec' a f n) = f n (zip a f n).pr₂ :=
 Eq.trans h₁ h₂
 
 -- Exercise 1.5
+-- Note α and β are forced to be in the same universe,
+-- since α and β must have the same type in the call to `bool.rec'`.
+-- This makes the definition somewhat weaker than the original.
 def sum₁ (α β : Type*) : Type* := Σ (x : bool), bool.rec' α β x
 
 namespace sum₁
--- idk why α and β have to be explicitly listed as implicit
 def ind {α β : Type*} (C : sum₁ α β → Type*)
   (c₁ : Π (a : α), C ⟨bool.ff, a⟩)
   (c₂ : Π (b : β), C ⟨bool.tt, b⟩) :
@@ -374,6 +374,116 @@ example {α β : Type*} {C : sum₁ α β → Type*}
 sum₁.ind C c₁ c₂ ⟨bool.tt, b⟩ = c₂ b := rfl
 
 end sum₁
+
+-- Exercise 1.8, 1.16
+namespace nat
+def mul : ℕ → ℕ → ℕ := nat.rec' (λ _, zero) (λ _ f n, add n (f n))
+-- Following the convention of `add` and `mul`,
+-- I define `exp m n` so that `exp 0 n = 1`. Thus `exp m n = n ^ m`.
+def exp : ℕ → ℕ → ℕ := nat.rec' (λ _, zero.succ) (λ _ f n, mul n (f n))
+
+infix ` * `:66 := mul
+
+example {n : ℕ} : mul zero n = zero := rfl
+example {n m : ℕ} : mul m.succ n = add n (mul m n) := rfl
+example {n : ℕ} : exp zero n = zero.succ := rfl
+example {n m : ℕ} : exp m.succ n = mul n (exp m n) := rfl
+
+-- The rest is proving that ℕ is a commutative semiring
+variables (k n m : ℕ)
+
+-- I have no idea why the hell removing the @ breaks the proof
+-- Full derivation of the inductive step left as an exercise to the reader
+def add_assoc : (k + n) + m = k + (n + m) :=
+let C := λ k, (k + n) + m = k + (n + m) in
+@nat.ind C rfl (λ k h, Eq.ap succ h) k
+
+def add_zero : n + zero = n :=
+let C := λ n, n + zero = n in
+@nat.ind C rfl (λ k h, Eq.ap succ h) n
+
+-- Recall `zero_add : zero + n = n` is a definitional equality.
+
+-- The proof is not trivial; it requires double induction
+def add_comm : n + m = m + n :=
+let C := λ n, n + m = m + n,
+h : Π (n m : ℕ), n + m = m + n :=
+  (let C₁ := λ n, Π (m : ℕ), n + m = m + n in
+    nat.ind C₁ (λ m, (add_zero m).symm)
+      (λ n h₁,
+        let C₂ := λ m, n.succ + m = m + n.succ in
+          nat.ind C₂ (add_zero n.succ)
+            (λ m h₂,
+              let h₃ : (n + m.succ).succ = (m.succ + n).succ :=
+                Eq.ap succ (h₁ m.succ),
+              h₄ : (m + n).succ.succ = (n + m).succ.succ :=
+                @Eq.ap _ _ (succ ∘ succ) _ _ (h₁ m).symm,
+              h₅ : (n.succ + m).succ = (m + n.succ).succ :=
+                Eq.ap succ h₂ in
+              Eq.trans (Eq.trans h₃ h₄) h₅))) in
+h n m
+
+def one_mul : zero.succ * k = k := add_zero k
+
+def mul_one : k * zero.succ = k :=
+let C := λ k, k * zero.succ = k in
+@nat.ind C rfl (λ k h, Eq.ap (add zero.succ) h) k
+
+def mul_zero : k * zero = zero :=
+let C := λ k, k * zero = zero in
+@nat.ind C rfl (λ k h, h) k
+
+-- `zero_mul : zero * k = zero` holds definitionally
+
+def mul_add : k * (n + m) = k * n + k * m :=
+let C := λ k, k * (n + m) = k * n + k * m in
+@nat.ind C rfl (λ k h,
+  let h₁ : (n + m) + k * (n + m) = (n + m) + (k * n + k * m) :=
+    Eq.ap (add (n + m)) h,
+  h₂ : (n + m) + (k * n + k * m) = n + (m + (k * n + k * m)) :=
+    add_assoc n m _,
+  h₃ : n + (m + (k * n + k * m)) = n + ((m + k * n) + k * m) :=
+    Eq.ap (add n) (add_assoc m (k * n) (k * m)).symm,
+  h₄ : n + ((m + k * n) + k * m) = n + ((k * n + m) + k * m) :=
+    @Eq.ap _ _ (λ x, n + (x + k * m)) _ _ (add_comm m (k * n)),
+  h₅ : n + ((k * n + m) + k * m) = n + (k * n + (m + k * m)) :=
+    Eq.ap (add n) (add_assoc (k * n) m (k * m)),
+  h₆ : n + (k * n + (m + k * m)) = (n + k * n) + (m + k * m) :=
+    (add_assoc n (k * n) _).symm in
+  Eq.trans (Eq.trans (Eq.trans (Eq.trans (Eq.trans h₁ h₂) h₃) h₄) h₅) h₆) k
+
+def add_mul : (n + m) * k = n * k + m * k :=
+let C := λ n, (n + m) * k = n * k + m * k in
+@nat.ind C rfl (λ n h,
+  let h₁ : k + (n + m) * k = k + (n * k + m * k) :=
+    Eq.ap (add k) h,
+  h₂ : k + (n * k + m * k) = (k + n * k) + m * k :=
+    (add_assoc _ _ _).symm in Eq.trans h₁ h₂) n
+
+def mul_assoc : (k * n) * m = k * (n * m) :=
+let C := λ k, (k * n) * m = k * (n * m) in
+@nat.ind C rfl (λ k h,
+  let h₁ : (n + k * n) * m = n * m + (k * n) * m :=
+    add_mul _ _ _,
+  h₂ : n * m + (k * n) * m = n * m + k * (n * m) :=
+    Eq.ap (add (n * m)) h in Eq.trans h₁ h₂) k
+
+def mul_comm : n * m = m * n :=
+let C := λ n, n * m = m * n in
+@nat.ind C (mul_zero m).symm (λ n h,
+  let h₁ : m + n * m = n * m + m :=
+    add_comm _ _,
+  h₂ : n * m + m = m * n + m :=
+    Eq.ap (λ x, x + m) h,
+  h₃ : m * n + m = m * n + m * zero.succ :=
+    Eq.ap (add (m * n)) (mul_one m).symm,
+  h₄ : m * n + m * zero.succ = m * (n + zero.succ) :=
+    (mul_add _ _ _).symm,
+  h₅ : m * (n + zero.succ) = m * (zero.succ + n) :=
+    Eq.ap (mul m) (add_comm _ _) in
+  Eq.trans (Eq.trans (Eq.trans (Eq.trans h₁ h₂) h₃) h₄) h₅) n
+
+end nat
 
 -- Exercise 1.9
 def fin : ℕ → Type* := λ n, Σ m, m < n
