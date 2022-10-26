@@ -46,6 +46,17 @@ Eq.ind C (λ a c, c)
 
 example {P : α → Type*} {a : α} : rec' P (Eq.refl a) = id := rfl
 
+-- The following results were not proven in ch1 but they are needed
+-- for some of the exercises
+def symm {a b : α} : a = b → b = a :=
+λ p, @Eq.rec' α (λ x, x = a) a b p rfl
+
+def trans {a b c : α} : a = b → b = c → a = c :=
+λ p, Eq.rec' (λ x, x = c → a = c) p id
+
+def ap (f : α → β) {a b : α} (p : a = b) : f a = f b :=
+@Eq.rec' α (λ x, f a = f x) _ _ p rfl
+
 end Eq
 
 
@@ -54,6 +65,8 @@ inductive prod (α : Type*) (β : Type*)
 | mk : α → β → prod
 
 infixr ` × `:35 := prod
+
+variables {x : γ}
 
 namespace prod
 -- The recursor, i.e. non-dependent eliminator
@@ -244,10 +257,6 @@ def sigma.rec₁ : (Π (a : α), f a → β) → (Σ (a : α), f a) → β := λ
 example {g : Π (a : α), f a → β} {a : α} {b : f a} : sigma.rec₁ g ⟨a, b⟩ = g a b := rfl
 
 -- Exercise 1.3
-def Eq.symm {a b : α} : a = b → b = a :=
-let P := λ x, x = a in
-λ p, @Eq.rec' α P a b p rfl
-
 def prod.ind₁ (C : α × β → Type*)
   (c : Π (a : α) (b : β), C ⟨a, b⟩) :
   Π (x : α × β), C x :=
@@ -305,13 +314,6 @@ example {a : α} {f : ℕ → α → α} : nat.rec₁ a f nat.zero = a := rfl
 
 -- Proving the other computation rule of `nat.rec₁` requires some
 -- intermediate results
-def Eq.ap (f : α → β) {a b : α} (p : a = b) : f a = f b :=
-let C := λ x, f a = f x in
-@Eq.rec' α C _ _ p rfl
-
-def Eq.trans {a b c : α} : a = b → b = c → a = c :=
-let C := λ (x : α), x = c → a = c in
-λ p, Eq.rec' C p id
 
 -- This is NOT definitionally true, and it must be proven via induction.
 -- Full derivation for the inductive step:
