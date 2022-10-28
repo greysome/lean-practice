@@ -1,11 +1,14 @@
 prelude  -- don't import `init` modules; we want to work from scratch
 
+notation f ` $ `:1 a:0 := f a
+
 variables {α β γ δ : Type*}
 
 def id {α : Type*} : α → α := λ a, a
 
-
 -- Avoid name clash with `eq`
+-- For some reason, I need to use `Sort` instead of `Type`
+-- for type class inference in ch2 to work. I have no idea why.
 inductive Eq {α : Type*} (a : α) : α → Type*
 | refl [] : Eq a
 
@@ -42,15 +45,17 @@ let D : Π (a b : α), a = b → Type* :=
 -- Exercise 1.15: indiscernability of identicals follows from path induction
 -- The justification for the name `transport` is in ch2
 @[elab_as_eliminator]
-def transport {P : α → Type*} {a b : α} (p : a = b) : P a → P b :=
+def transport {a b : α} {P : α → Type*} (p : a = b) : P a → P b :=
 Eq.ind (λ a, @id (P a)) a b p
 
 @[elab_as_eliminator]
 def ap (f : α → β) {a b : α} (p : a = b) : f a = f b :=
 transport p (refl (f a))
 
+infixr ` ▸ `:75 := ap
+
 example {P : α → Type*} {a : α} : @@transport P (refl a) = id := rfl
-example {f : α → β} {a : α} : ap f (refl a) = refl (f a) := rfl
+example {f : α → β} {a : α} : f ▸ refl a = refl (f a) := rfl
 
 -- The following results were not proven in ch1 but they are needed
 -- for some of the exercises
@@ -63,6 +68,10 @@ def trans {a b c : α} : a = b → b = c → a = c :=
 end Eq
 
 
+
+-- Names such as `refl`, `ap` and `transport` are so ubiquitous that
+-- I choose to make them top-level names
+open Eq
 
 inductive prod (α : Type*) (β : Type*)
 | mk : α → β → prod
@@ -251,7 +260,7 @@ end prop
 
 -- Exercise 1.1
 def comp (g : β → γ) (f : α → β) : α → γ := λ x, g (f x)
-infix ` ∘ `:63 := comp
+infix ` ∘ `:76 := comp
 example {f : α → β} {g : β → γ} {h : γ → δ} : h ∘ (g ∘ f) = (h ∘ g) ∘ f := rfl
 
 -- Exercise 1.2
@@ -266,12 +275,12 @@ example {g : Π (a : α), f a → β} {a : α} {b : f a} : sigma.rec₁ g ⟨a, 
 def prod.ind₁ {C : α × β → Type*}
   (c : Π (a : α) (b : β), C ⟨a, b⟩) :
   Π (x : α × β), C x :=
-λ x, Eq.transport x.uniq.symm (c x.pr₁ x.pr₂)
+λ x, transport x.uniq.symm (c x.pr₁ x.pr₂)
 
 -- Full derivation:
 -- prod.ind₁ c ⟨a, b⟩
--- ≡ Eq.transport ⟨a, b⟩.uniq.symm (c a b)
--- ≡ Eq.transport rfl (c a b)
+-- ≡ transport ⟨a, b⟩.uniq.symm (c a b)
+-- ≡ transport rfl (c a b)
 -- ≡ id (c a b)
 -- ≡ (c a b)
 example {C : α × β → Type*} {c : Π (a : α) (b : β), C ⟨a, b⟩}
@@ -287,7 +296,7 @@ let C := λ (x : Σ (a : α), f a), x = ⟨x.pr₁, x.pr₂⟩ in
 def sigma.ind₁ {C : (Σ (a : α), f a) → Type*}
   (c : Π (a : α) (b : f a), C ⟨a, b⟩) :
   Π (x : Σ (a : α), f a), C x :=
-λ x, Eq.transport x.uniq.symm (c x.pr₁ x.pr₂)
+λ x, transport x.uniq.symm (c x.pr₁ x.pr₂)
 
 example {C : (Σ (a : α), f a) → Type*}
   {c : Π (a : α) (b : f a), C ⟨a, b⟩}
@@ -330,7 +339,7 @@ example {a : α} {f : ℕ → α → α} : nat.rec₁ a f nat.zero = a := rfl
 -- ≡ ⟨n.succ, f n (nat.rec' a f n)⟩
 -- ≡ ⟨n.succ, nat.rec' a f n.succ⟩
 def aux (a : α) (f : ℕ → α → α) (n : ℕ) : zip a f n = ⟨n, nat.rec' a f n⟩ :=
-nat.ind rfl (λ n h, Eq.ap (G f) h) n
+nat.ind rfl (λ n h, G f ▸ h) n
 
 -- Full derivation:
 -- nat.rec₁ a f n.succ
@@ -342,9 +351,9 @@ nat.ind rfl (λ n h, Eq.ap (G f) h) n
 example {a : α} {f : ℕ → α → α} {n : ℕ} :
   nat.rec₁ a f n.succ = f n (nat.rec₁ a f n) :=
 let h₁ : (zip a f n.succ).pr₂ = nat.rec' a f n.succ :=
-  Eq.ap prod.pr₂ (aux a f n.succ),
+  prod.pr₂ ▸ (aux a f n.succ),
 h₂ : f n (nat.rec' a f n) = f n (zip a f n).pr₂ :=
-  Eq.ap (λ (x : ℕ × α), f n x.pr₂) (aux a f n).symm in
+  (λ (x : ℕ × α), f n x.pr₂) ▸ (aux a f n).symm in
 Eq.trans h₁ h₂
 
 -- Exercise 1.5
@@ -404,10 +413,10 @@ variables (k n m : ℕ)
 -- I have no idea why the hell removing the @ breaks the proof
 -- Full derivation of the inductive step left as an exercise to the reader
 def add_assoc : (k + n) + m = k + (n + m) :=
-nat.ind rfl (λ k h, Eq.ap succ h) k
+nat.ind rfl (λ k h, succ ▸ h) k
 
 def add_zero : n + zero = n :=
-nat.ind rfl (λ k h, Eq.ap succ h) n
+nat.ind rfl (λ k h, succ ▸ h) n
 
 -- Recall `zero_add : zero + n = n` is a definitional equality.
 
@@ -421,18 +430,18 @@ let h : Π (n m : ℕ), n + m = m + n :=
           @@nat.ind C₂ (add_zero n.succ)
             (λ m h₂,
               let h₃ : (n + m.succ).succ = (m.succ + n).succ :=
-                Eq.ap succ (h₁ m.succ),
+                succ ▸ h₁ m.succ,
               h₄ : (m + n).succ.succ = (n + m).succ.succ :=
-                Eq.ap (succ ∘ succ) (h₁ m).symm,
+                succ ∘ succ ▸ (h₁ m).symm,
               h₅ : (n.succ + m).succ = (m + n.succ).succ :=
-                Eq.ap succ h₂ in
+                succ ▸ h₂ in
               Eq.trans (Eq.trans h₃ h₄) h₅))) in
 h n m
 
 def one_mul : zero.succ * k = k := add_zero k
 
 def mul_one : k * zero.succ = k :=
-nat.ind rfl (λ k h, Eq.ap (add zero.succ) h) k
+nat.ind rfl (λ k h, add zero.succ ▸ h) k
 
 def mul_zero : k * zero = zero :=
 nat.ind rfl (λ k h, h) k
@@ -442,15 +451,15 @@ nat.ind rfl (λ k h, h) k
 def mul_add : k * (n + m) = k * n + k * m :=
 nat.ind rfl (λ k h,
   let h₁ : (n + m) + k * (n + m) = (n + m) + (k * n + k * m) :=
-    Eq.ap (add (n + m)) h,
+    add (n + m) ▸ h,
   h₂ : (n + m) + (k * n + k * m) = n + (m + (k * n + k * m)) :=
     add_assoc n m _,
   h₃ : n + (m + (k * n + k * m)) = n + ((m + k * n) + k * m) :=
-    Eq.ap (add n) (add_assoc m (k * n) (k * m)).symm,
+    add n ▸ (add_assoc _ _ _).symm,
   h₄ : n + ((m + k * n) + k * m) = n + ((k * n + m) + k * m) :=
-    Eq.ap (λ x, n + (x + k * m)) (add_comm m (k * n)),
+    (λ x, n + (x + k * m)) ▸ add_comm m (k * n),
   h₅ : n + ((k * n + m) + k * m) = n + (k * n + (m + k * m)) :=
-    Eq.ap (add n) (add_assoc (k * n) m (k * m)),
+    add n ▸ add_assoc (k * n) m (k * m),
   h₆ : n + (k * n + (m + k * m)) = (n + k * n) + (m + k * m) :=
     (add_assoc n (k * n) _).symm in
   Eq.trans (Eq.trans (Eq.trans (Eq.trans (Eq.trans h₁ h₂) h₃) h₄) h₅) h₆) k
@@ -458,7 +467,7 @@ nat.ind rfl (λ k h,
 def add_mul : (n + m) * k = n * k + m * k :=
 nat.ind rfl (λ n h,
   let h₁ : k + (n + m) * k = k + (n * k + m * k) :=
-    Eq.ap (add k) h,
+    add k ▸ h,
   h₂ : k + (n * k + m * k) = (k + n * k) + m * k :=
     (add_assoc _ _ _).symm in Eq.trans h₁ h₂) n
 
@@ -467,20 +476,20 @@ nat.ind rfl (λ k h,
   let h₁ : (n + k * n) * m = n * m + (k * n) * m :=
     add_mul _ _ _,
   h₂ : n * m + (k * n) * m = n * m + k * (n * m) :=
-    Eq.ap (add (n * m)) h in Eq.trans h₁ h₂) k
+    add (n * m) ▸ h in Eq.trans h₁ h₂) k
 
 def mul_comm : n * m = m * n :=
 nat.ind (mul_zero m).symm (λ n h,
   let h₁ : m + n * m = n * m + m :=
     add_comm _ _,
   h₂ : n * m + m = m * n + m :=
-    Eq.ap (λ x, x + m) h,
+    (λ x, x + m) ▸ h,
   h₃ : m * n + m = m * n + m * zero.succ :=
-    Eq.ap (add (m * n)) (mul_one m).symm,
+    add (m * n) ▸ (mul_one m).symm,
   h₄ : m * n + m * zero.succ = m * (n + zero.succ) :=
     (mul_add _ _ _).symm,
   h₅ : m * (n + zero.succ) = m * (zero.succ + n) :=
-    Eq.ap (mul m) (add_comm _ _) in
+    mul m ▸ add_comm _ _ in
   Eq.trans (Eq.trans (Eq.trans (Eq.trans h₁ h₂) h₃) h₄) h₅) n
 
 end nat
