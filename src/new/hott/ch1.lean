@@ -1,58 +1,57 @@
-prelude  -- don't import `init` modules; we want to work from scratch
+prelude
+import .my_tactics
 
-notation f ` $ `:1 a:0 := f a
+namespace hott
+open_locale hott
+
+localized "notation f ` $ `:1 a:0 := f a" in hott
 
 variables {α β γ δ : Type*}
 
-def id {α : Type*} : α → α := λ a, a
-
--- Avoid name clash with `eq`
--- For some reason, I need to use `Sort` instead of `Type`
--- for type class inference in ch2 to work. I have no idea why.
-inductive Eq {α : Type*} (a : α) : α → Type*
-| refl [] : Eq a
-
-infix ` = `:50 := Eq
-notation `rfl` := Eq.refl _
+def id : α → α := λ a, a
 
 namespace Eq
--- Path induction
 @[elab_as_eliminator]
-def ind {C : Π (a b : α), a = b → Type*}
+def ind_on {C : Π (a b : α), a = b → Type*}
+  {a b : α} (p : a = b)
   (c : Π (a : α), C a a rfl) :
-  Π (a b : α) (p : a = b), C a b p :=
-λ a b p, @Eq.rec α a (C a) (c a) b p
+  C a b p :=
+@Eq.rec α a (C a) (c a) b p
 
 -- Based path induction
 @[elab_as_eliminator]
-def ind' (a : α)
+def ind_on' (a : α)
   {C : Π (b : α), a = b → Type*}
+  {b : α} (p : a = b)
   (c : C a rfl) :
-  Π (b : α) (p : a = b), C b p :=
-λ b p, @Eq.rec α a C c b p
+  C b p :=
+@Eq.rec α a C c b p
 
 -- Based path induction, proven using `ind`
-def ind'₁ (a : α)
+def ind_on'₁ (a : α)
   {C : Π (b : α), a = b → Type*}
+  {b : α} (p : a = b)
   (c : C a rfl) :
-  Π (b : α) (p : a = b), C b p :=
+  C b p :=
 let D : Π (a b : α), a = b → Type* :=
     λ a b p, Π (C : Π (z : α), a = z → Type*), C a rfl → C b p,
   d : Π (a : α), D a a rfl := λ x C, id,
-  f : Π (a b : α) (p : a = b), D a b p := Eq.ind d in
-λ b p, f a b p C c
+  f : D a b p := Eq.ind_on p d in
+f C c
 
 -- Exercise 1.15: indiscernability of identicals follows from path induction
 -- The justification for the name `transport` is in ch2
 @[elab_as_eliminator]
 def transport {a b : α} {P : α → Type*} (p : a = b) : P a → P b :=
-Eq.ind (λ a, @id (P a)) a b p
+Eq.ind_on p (λ a, @id (P a))
+
+localized "postfix `∗ `:51 := Eq.transport" in hott
 
 @[elab_as_eliminator]
 def ap (f : α → β) {a b : α} (p : a = b) : f a = f b :=
-transport p (refl (f a))
+p∗ (refl (f a))
 
-infixr ` ▸ `:75 := ap
+localized "infixr ` ▸ `:75 := Eq.ap" in hott
 
 example {P : α → Type*} {a : α} : @@transport P (refl a) = id := rfl
 example {f : α → β} {a : α} : f ▸ refl a = refl (f a) := rfl
@@ -60,13 +59,15 @@ example {f : α → β} {a : α} : f ▸ refl a = refl (f a) := rfl
 -- The following results were not proven in ch1 but they are needed
 -- for some of the exercises
 def symm {a b : α} : a = b → b = a :=
-λ p, transport p (refl a)
+λ p, p∗ (refl a)
 
 def trans {a b c : α} : a = b → b = c → a = c :=
-λ p, transport p (@id (a = c))
+λ p, p∗ (@id (a = c))
+
+localized "postfix `⁻¹`:1034 := Eq.symm" in hott
+localized "infix ` ⬝ `:51 := Eq.trans" in hott
 
 end Eq
-
 
 
 -- Names such as `refl`, `ap` and `transport` are so ubiquitous that
@@ -76,7 +77,7 @@ open Eq
 inductive prod (α : Type*) (β : Type*)
 | mk : α → β → prod
 
-infixr ` × `:35 := prod
+localized "infixr ` × `:51 := prod" in hott
 
 variables {x : γ}
 
@@ -113,7 +114,7 @@ inductive sigma {α : Type*} (f : α → Type*)
 | mk : Π (a : α), f a → sigma
 
 -- I just copy pasted this line, I have no idea how it works
-notation `Σ` binders `, ` r:(scoped f, sigma f) := r
+localized "notation `Σ` binders `, ` r:(scoped f, sigma f) := r" in hott
 
 namespace sigma
 variable {f : α → Type*}
@@ -146,7 +147,7 @@ inductive sum (α : Type*) (β : Type*)
 | inl : α → sum
 | inr : β → sum
 
-infixr ` ⊕ `:34 := sum
+localized "infixr ` ⊕ `:51 := sum" in hott
 
 namespace sum
 def rec' : (α → γ) → (β → γ) → α ⊕ β → γ := @sum.rec α β (λ _, γ)
@@ -209,7 +210,7 @@ inductive nat
 | zero : nat
 | succ : nat → nat
 
-notation `ℕ` := nat
+localized "notation `ℕ` := nat" in hott
 
 namespace nat
 def rec' : α → (ℕ → α → α) → ℕ → α := @nat.rec (λ _, α)
@@ -219,25 +220,29 @@ def ind : Π {C : ℕ → Type*}, C zero →
   (Π (n : ℕ), C n → C (succ n)) → Π (n : ℕ), C n :=
 @nat.rec
 
+@[elab_as_eliminator]
+def ind_on : Π {C : ℕ → Type*} (n : ℕ),
+  C zero → (Π (n : ℕ), C n → C (succ n)) → C n :=
+@nat.rec_on
+
 def double : ℕ → ℕ := nat.rec' zero (λ n y, succ (succ y)) 
 def add : ℕ → ℕ → ℕ := nat.rec' id (λ m f n, succ (f n))
-infix ` + `:65 := add
 
 example : double (zero.succ.succ) = zero.succ.succ.succ.succ := rfl
 example : add zero.succ zero.succ.succ = zero.succ.succ.succ := rfl
 
-def le (n m : ℕ) := Σ k, k + n = m
-def lt (n m : ℕ) := Σ (k : ℕ), k.succ + n = m  
-
-infix ` < `:50 := lt
-infix ` ≤ `:50 := le
+def le (n m : ℕ) := Σ k, add k n = m
+def lt (n m : ℕ) := Σ (k : ℕ), add k.succ n = m  
 
 end nat
 
+localized "infix ` + `:65 := nat.add" in hott
+localized "infix ` < `:50 := nat.lt" in hott
+localized "infix ` ≤ `:50 := nat.le" in hott
 
 
 -- Propositional reasoning, by encoding propositions as types
-prefix `¬`:40 := λ a, a → empty
+localized "prefix `¬`:1034 := λ a, a → empty" in hott
 
 namespace prop
 variables {A B : Type*} -- Think of these as representing propositions
@@ -258,9 +263,11 @@ end prop
 
 
 
+open_locale hott
+
 -- Exercise 1.1
 def comp (g : β → γ) (f : α → β) : α → γ := λ x, g (f x)
-infix ` ∘ `:76 := comp
+localized "infix ` ∘ `:76 := comp" in hott
 example {f : α → β} {g : β → γ} {h : γ → δ} : h ∘ (g ∘ f) = (h ∘ g) ∘ f := rfl
 
 -- Exercise 1.2
@@ -275,12 +282,12 @@ example {g : Π (a : α), f a → β} {a : α} {b : f a} : sigma.rec₁ g ⟨a, 
 def prod.ind₁ {C : α × β → Type*}
   (c : Π (a : α) (b : β), C ⟨a, b⟩) :
   Π (x : α × β), C x :=
-λ x, transport x.uniq.symm (c x.pr₁ x.pr₂)
+λ x, (x.uniq)⁻¹∗ (c x.pr₁ x.pr₂)
 
 -- Full derivation:
 -- prod.ind₁ c ⟨a, b⟩
--- ≡ transport ⟨a, b⟩.uniq.symm (c a b)
--- ≡ transport rfl (c a b)
+-- ≡ (⟨a, b⟩.uniq)⁻¹∗ (c a b)
+-- ≡ rfl∗ (c a b)
 -- ≡ id (c a b)
 -- ≡ (c a b)
 example {C : α × β → Type*} {c : Π (a : α) (b : β), C ⟨a, b⟩}
@@ -296,7 +303,7 @@ let C := λ (x : Σ (a : α), f a), x = ⟨x.pr₁, x.pr₂⟩ in
 def sigma.ind₁ {C : (Σ (a : α), f a) → Type*}
   (c : Π (a : α) (b : f a), C ⟨a, b⟩) :
   Π (x : Σ (a : α), f a), C x :=
-λ x, transport x.uniq.symm (c x.pr₁ x.pr₂)
+λ x, (x.uniq)⁻¹∗ (c x.pr₁ x.pr₂)
 
 example {C : (Σ (a : α), f a) → Type*}
   {c : Π (a : α) (b : f a), C ⟨a, b⟩}
@@ -339,7 +346,7 @@ example {a : α} {f : ℕ → α → α} : nat.rec₁ a f nat.zero = a := rfl
 -- ≡ ⟨n.succ, f n (nat.rec' a f n)⟩
 -- ≡ ⟨n.succ, nat.rec' a f n.succ⟩
 def aux (a : α) (f : ℕ → α → α) (n : ℕ) : zip a f n = ⟨n, nat.rec' a f n⟩ :=
-nat.ind rfl (λ n h, G f ▸ h) n
+nat.ind_on n rfl (λ n h, G f ▸ h)
 
 -- Full derivation:
 -- nat.rec₁ a f n.succ
@@ -353,8 +360,8 @@ example {a : α} {f : ℕ → α → α} {n : ℕ} :
 let h₁ : (zip a f n.succ).pr₂ = nat.rec' a f n.succ :=
   prod.pr₂ ▸ (aux a f n.succ),
 h₂ : f n (nat.rec' a f n) = f n (zip a f n).pr₂ :=
-  (λ (x : ℕ × α), f n x.pr₂) ▸ (aux a f n).symm in
-Eq.trans h₁ h₂
+  (λ (x : ℕ × α), f n x.pr₂) ▸ (aux a f n)⁻¹ in
+h₁ ⬝ h₂
 
 -- Exercise 1.5
 -- Note α and β are forced to be in the same universe,
@@ -400,8 +407,11 @@ def mul : ℕ → ℕ → ℕ := nat.rec' (λ _, zero) (λ _ f n, add n (f n))
 -- I define `exp m n` so that `exp 0 n = 1`. Thus `exp m n = n ^ m`.
 def exp : ℕ → ℕ → ℕ := nat.rec' (λ _, zero.succ) (λ _ f n, mul n (f n))
 
-infix ` * `:66 := mul
+end nat
 
+localized "infix ` * `:66 := nat.mul" in hott
+
+namespace nat
 example {n : ℕ} : mul zero n = zero := rfl
 example {n m : ℕ} : mul m.succ n = add n (mul m n) := rfl
 example {n : ℕ} : exp zero n = zero.succ := rfl
@@ -413,84 +423,83 @@ variables (k n m : ℕ)
 -- I have no idea why the hell removing the @ breaks the proof
 -- Full derivation of the inductive step left as an exercise to the reader
 def add_assoc : (k + n) + m = k + (n + m) :=
-nat.ind rfl (λ k h, succ ▸ h) k
+nat.ind_on k rfl (λ k h, succ ▸ h)
 
 def add_zero : n + zero = n :=
-nat.ind rfl (λ k h, succ ▸ h) n
+nat.ind_on n rfl (λ k h, succ ▸ h)
 
 -- Recall `zero_add : zero + n = n` is a definitional equality.
 
 -- The proof is not trivial; it requires double induction
 def add_comm : n + m = m + n :=
-let h : Π (n m : ℕ), n + m = m + n :=
-  (let C₁ := λ n, Π (m : ℕ), n + m = m + n in
-    @@nat.ind C₁ (λ m, (add_zero m).symm)
-      (λ n h₁,
-        let C₂ := λ m, n.succ + m = m + n.succ in
-          @@nat.ind C₂ (add_zero n.succ)
-            (λ m h₂,
-              let h₃ : (n + m.succ).succ = (m.succ + n).succ :=
-                succ ▸ h₁ m.succ,
-              h₄ : (m + n).succ.succ = (n + m).succ.succ :=
-                succ ∘ succ ▸ (h₁ m).symm,
-              h₅ : (n.succ + m).succ = (m + n.succ).succ :=
-                succ ▸ h₂ in
-              Eq.trans (Eq.trans h₃ h₄) h₅))) in
-h n m
+begin
+  revert m,
+  induction n with n hn,
+  { exact λ m, (add_zero _)⁻¹ },
+  { intro m, induction m with m hm,
+    { exact (add_zero _) },
+    let h₁ : (n + m.succ).succ = (m.succ + n).succ :=
+      succ ▸ hn m.succ,
+    let h₂ : (m + n).succ.succ = (n + m).succ.succ :=
+      succ ∘ succ ▸ (hn m)⁻¹,
+    let h₃ : (n.succ + m).succ = (m + n.succ).succ :=
+      succ ▸ hm,
+    exact h₁ ⬝ h₂ ⬝ h₃ }
+end
 
 def one_mul : zero.succ * k = k := add_zero k
 
 def mul_one : k * zero.succ = k :=
-nat.ind rfl (λ k h, add zero.succ ▸ h) k
+nat.ind_on k rfl (λ k h, add zero.succ ▸ h)
 
 def mul_zero : k * zero = zero :=
-nat.ind rfl (λ k h, h) k
+nat.ind_on k rfl (λ k h, h)
 
 -- `zero_mul : zero * k = zero` holds definitionally
 
 def mul_add : k * (n + m) = k * n + k * m :=
-nat.ind rfl (λ k h,
+nat.ind_on k rfl (λ k h,
   let h₁ : (n + m) + k * (n + m) = (n + m) + (k * n + k * m) :=
     add (n + m) ▸ h,
   h₂ : (n + m) + (k * n + k * m) = n + (m + (k * n + k * m)) :=
     add_assoc n m _,
   h₃ : n + (m + (k * n + k * m)) = n + ((m + k * n) + k * m) :=
-    add n ▸ (add_assoc _ _ _).symm,
+    add n ▸ (add_assoc _ _ _)⁻¹,
   h₄ : n + ((m + k * n) + k * m) = n + ((k * n + m) + k * m) :=
     (λ x, n + (x + k * m)) ▸ add_comm m (k * n),
   h₅ : n + ((k * n + m) + k * m) = n + (k * n + (m + k * m)) :=
     add n ▸ add_assoc (k * n) m (k * m),
   h₆ : n + (k * n + (m + k * m)) = (n + k * n) + (m + k * m) :=
-    (add_assoc n (k * n) _).symm in
-  Eq.trans (Eq.trans (Eq.trans (Eq.trans (Eq.trans h₁ h₂) h₃) h₄) h₅) h₆) k
+    (add_assoc n (k * n) _)⁻¹ in
+  h₁ ⬝ h₂ ⬝ h₃ ⬝ h₄ ⬝ h₅ ⬝ h₆)
 
 def add_mul : (n + m) * k = n * k + m * k :=
-nat.ind rfl (λ n h,
+nat.ind_on n rfl (λ n h,
   let h₁ : k + (n + m) * k = k + (n * k + m * k) :=
     add k ▸ h,
   h₂ : k + (n * k + m * k) = (k + n * k) + m * k :=
-    (add_assoc _ _ _).symm in Eq.trans h₁ h₂) n
+    (add_assoc _ _ _)⁻¹ in h₁ ⬝ h₂)
 
 def mul_assoc : (k * n) * m = k * (n * m) :=
-nat.ind rfl (λ k h,
+nat.ind_on k rfl (λ k h,
   let h₁ : (n + k * n) * m = n * m + (k * n) * m :=
     add_mul _ _ _,
   h₂ : n * m + (k * n) * m = n * m + k * (n * m) :=
-    add (n * m) ▸ h in Eq.trans h₁ h₂) k
+    add (n * m) ▸ h in h₁ ⬝ h₂)
 
 def mul_comm : n * m = m * n :=
-nat.ind (mul_zero m).symm (λ n h,
+nat.ind_on n (mul_zero m)⁻¹ (λ n h,
   let h₁ : m + n * m = n * m + m :=
     add_comm _ _,
   h₂ : n * m + m = m * n + m :=
     (λ x, x + m) ▸ h,
   h₃ : m * n + m = m * n + m * zero.succ :=
-    add (m * n) ▸ (mul_one m).symm,
+    add (m * n) ▸ (mul_one m)⁻¹,
   h₄ : m * n + m * zero.succ = m * (n + zero.succ) :=
-    (mul_add _ _ _).symm,
+    (mul_add _ _ _)⁻¹,
   h₅ : m * (n + zero.succ) = m * (zero.succ + n) :=
     mul m ▸ add_comm _ _ in
-  Eq.trans (Eq.trans (Eq.trans (Eq.trans h₁ h₂) h₃) h₄) h₅) n
+  h₁ ⬝ h₂ ⬝ h₃ ⬝ h₄ ⬝ h₅)
 
 end nat
 
@@ -524,3 +533,5 @@ example : ¬¬ (A ⊕ ¬ A) :=
 -- Exercise 1.15: see definition of `Eq.rec`
 
 end prop
+
+end hott

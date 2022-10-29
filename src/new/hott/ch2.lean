@@ -1,19 +1,18 @@
 prelude
 import .ch1
 
+namespace hott
+open_locale hott
+
 variables {α β γ δ : Type*}
 variables {a b c d : α} (p : a = b) (q : b = c) (r : c = d)
 
 namespace Eq
 -- The computation rules associated with various proofs of
 -- symmetry and transitivity of Eq
-postfix `⁻¹`:1034 := symm
-example : (refl a)⁻¹  = rfl := rfl
+example : (refl a)⁻¹ = rfl := rfl
 
-infix ` ⬝ `:51 := trans
 example : rfl ⬝ p = p := rfl
-
-postfix `∗ `:51 := transport
 
 -- Two other proofs of transitivity with different computation rules
 def trans₁ : a = b → b = c → a = c :=
@@ -31,56 +30,41 @@ example : trans₂ (refl a) rfl = rfl := rfl
 -- example : trans₂ rfl p = p := rfl
 
 def concat_rfl : p ⬝ rfl = p :=
-Eq.ind (λ a, (rfl : refl a ⬝ rfl = rfl)) a b p
+Eq.ind_on p (λ a, (rfl : refl a ⬝ rfl = rfl))
 
 -- See the example above
 def rfl_concat : rfl ⬝ p = p := rfl
 
 def inv_concat : p⁻¹ ⬝ p = rfl :=
 let C : Π (a b : α), a = b → Type* := λ a b p, p⁻¹ ⬝ p = rfl in
-Eq.ind (λ a, (rfl : (refl a)⁻¹ ⬝ rfl = rfl)) a b p
+Eq.ind_on p (λ a, (rfl : (refl a)⁻¹ ⬝ rfl = rfl))
 
 def concat_inv : p ⬝ p⁻¹ = rfl :=
-Eq.ind (λ a, (rfl : (refl a) ⬝ rfl⁻¹ = rfl)) a b p
+Eq.ind_on p (λ a, (rfl : (refl a) ⬝ rfl⁻¹ = rfl))
 
 def inv_inv : p⁻¹⁻¹ = p :=
 let C : Π (a b : α), a = b → Type* := λ a b p, p⁻¹⁻¹ = p in
-Eq.ind (λ a, (rfl : (refl a)⁻¹⁻¹ = rfl)) a b p
+Eq.ind_on p (λ a, (rfl : (refl a)⁻¹⁻¹ = rfl))
 
 -- As with `Eq.trans`, one can perform induction three ways.
 -- As usual I do induction on `p`, and in fact it's the most
 -- convenient since the proof of the base case follows definitionally.
 def concat_assoc : (p ⬝ q) ⬝ r = p ⬝ (q ⬝ r) :=
-Eq.ind (λ a c d q r, (rfl : (rfl ⬝ q) ⬝ r = rfl ⬝ (q ⬝ r)))
-  a b p c d q r
+Eq.ind_on p (λ a c d q r, (rfl : (rfl ⬝ q) ⬝ r = rfl ⬝ (q ⬝ r)))
+  c d q r
 
 
--- Preliminaries for proving Eckmann-Hilton
-def pointed : Type* := Σ (α : Type*), α
-
-def loop_space' : ℕ → pointed → pointed :=
-nat.rec' id (λ _ Ωⁿ x, Ωⁿ ⟨x.pr₂ = x.pr₂, rfl⟩)
-
-def loop_space : ℕ → α → Type* :=
-λ n a, (loop_space' n ⟨α, a⟩).pr₁
-
-prefix `Ω`:50 := loop_space
--- How to generalise this notation to all natural arguments?
-prefix `Ω²`:50 := loop_space nat.zero.succ.succ
-
--- Sanity check that the definition of `loop_space` is correct
-example : Ω² a = (refl a = rfl) := rfl
 
 def whisker_right {p q : a = b} (A : p = q) (r : b = c) :
   p ⬝ r = q ⬝ r :=
-Eq.ind (λ b a p q A, p.concat_rfl ⬝ A ⬝ q.concat_rfl⁻¹) b c r a p q A
+Eq.ind_on r (λ b a p q A, p.concat_rfl ⬝ A ⬝ q.concat_rfl⁻¹) a p q A
 
 def whisker_left {r s : b = c} (q : a = b) (B : r = s) :
   q ⬝ r = q ⬝ s :=
-Eq.ind (λ a c r s B, r.rfl_concat ⬝ B ⬝ s.rfl_concat⁻¹) a b q c r s B
+Eq.ind_on q (λ a c r s B, r.rfl_concat ⬝ B ⬝ s.rfl_concat⁻¹) c r s B
 
-infix ` ⬝r `:50 := whisker_right
-infix ` ⬝l `:50 := whisker_left
+localized "infix ` ⬝r `:50 := whisker_right" in hott
+localized "infix ` ⬝l `:50 := whisker_left" in hott
 
 -- One could also define `whisker_right` and `whisker_left` via
 -- transport, but we lose our nice judgmental equality:
@@ -94,61 +78,78 @@ B∗ rfl
 
 def cancel_left {r s : b = c} (q : a = b) (A : q ⬝ r = q ⬝ s) :
   r = s :=
-Eq.ind (λ a c r s A, A) a b q c r s A
+Eq.ind_on q (λ a c r s A, A) c r s A
 
 def cancel_right {p q : a = b} (r : b = c) (A : p ⬝ r = q ⬝ r) :
   p = q :=
-Eq.ind (λ b a p q A, p.concat_rfl⁻¹ ⬝ A ⬝ q.concat_rfl) b c r a p q A
+Eq.ind_on r (λ b a p q A, p.concat_rfl⁻¹ ⬝ A ⬝ q.concat_rfl) a p q A
 
 
 
 variables (f : α → β) (g : β → γ)
 
 def ap_concat : f ▸ (p ⬝ q) = f ▸ p ⬝ f ▸ q :=
-Eq.ind (λ a c q, rfl) a b p c q
+Eq.ind_on p (λ a c q, rfl) c q
 
 def ap_inv : f ▸ p⁻¹ = (f ▸ p)⁻¹ :=
-Eq.ind (λ a, rfl) a b p
+Eq.ind_on p (λ a, rfl)
 
 def ap_ap : g ▸ f ▸ p = (g ∘ f) ▸ p :=
-Eq.ind (λ a, rfl) a b p
+Eq.ind_on p (λ a, rfl)
 
 def ap_id : id ▸ p = p :=
-Eq.ind (λ a, rfl) a b p
+Eq.ind_on p (λ a, rfl)
 
 
 
 variables {P : α → Type*}
 
 def lift (u : P a) : (⟨a, u⟩ : sigma P) = ⟨b, p∗ u⟩ :=
-Eq.ind (λ a u, rfl) a b p u
+Eq.ind_on p (λ a u, rfl) u
 
 def project {u v : sigma P} (q : u = v) : u.pr₁ = v.pr₁ :=
-Eq.ind (λ u, rfl) u v q
+Eq.ind_on q (λ u, rfl)
 
 example {p : a = b} {u : P a} : project (lift p u) = p :=
-Eq.ind (λ a u, rfl) a b p u
+Eq.ind_on p (λ a u, rfl) u
 
 def apd (f : Π (x : α), P x) (p : a = b) : (p∗ (f a) : P b) = f b :=
-Eq.ind (λ a, rfl) a b p
+Eq.ind_on p (λ a, rfl)
 
 def transportconst (p : a = b) (x : β) : (p∗ x : β) = x :=
-Eq.ind (λ a, rfl) a b p
+Eq.ind_on p (λ a, rfl)
 
 def apd_eq_concat_ap (f : α → β) (p : a = b) :
   apd f p = transportconst p (f a) ⬝ (f ▸ p) :=
-Eq.ind (λ a, rfl) a b p
+Eq.ind_on p (λ a, rfl)
 
 def transport_concat (p : a = b) (q : b = c) (u : P a) :
   (q∗ (p∗ u) : P c) = (p⬝q)∗ u :=
-Eq.ind (λ a q u, rfl) a b p q u
+Eq.ind_on p (λ a q u, rfl) q u
 
 def transport_over {P Q : α → Type*} (f : Π (a : α), P a → Q a) (p : a = b) (u : P a) :
   (p∗ (f a u) : Q b) = f b (p∗ u) :=
-Eq.ind (λ a u, rfl) a b p u
+Eq.ind_on p (λ a u, rfl) u
 
 
 namespace eckmann_hilton
+-- Preliminaries for proving Eckmann-Hilton
+def pointed : Type* := Σ (α : Type*), α
+
+def loop_space' : ℕ → pointed → pointed :=
+nat.rec' id (λ _ Ωⁿ x, Ωⁿ ⟨x.pr₂ = x.pr₂, rfl⟩)
+
+def loop_space : ℕ → α → Type* :=
+λ n a, (loop_space' n ⟨α, a⟩).pr₁
+
+localized "prefix `Ω `:50 := eckmann_hilton.loop_space" in hott
+-- How to generalise this local notation to all natural arguments?
+localized "prefix `Ω²`:50 := eckmann_hilton.loop_space nat.zero.succ.succ" in hott
+
+-- Sanity check that the definition of `loop_space` is correct
+example : Ω² a = (refl a = rfl) := rfl
+
+
 def star {p q : a = b} {r s : b = c} (A : p = q) (B : r = s) :
   p ⬝ r = q ⬝ s :=
 (A ⬝r r) ⬝ (q ⬝l B)
@@ -179,11 +180,10 @@ let A' := (concat_rfl rfl) ⬝ A ⬝ (concat_rfl rfl)⁻¹,
 h₃ ⬝ h₄
 
 def star_eq_star₁ : star A B = star₁ A B :=
-let C := λ (p q : a = a) (A : p = q), star A B = star₁ A B in
-@@Eq.ind C (λ (p : a = a),
-  let C' := λ (r s : a = a) (B : r = s), star (refl p) B = star₁ (refl p) B in
-  @@Eq.ind C' (λ (r : a = a), _) rfl rfl B
-) rfl rfl A
+begin
+  --induction (A : (refl a) = rfl),
+  sorry
+end
 
 def main : A ⬝ B = B ⬝ A :=
 (star_eq_concat A B)⁻¹ ⬝ (star_eq_star₁ A B) ⬝ (star₁_eq_concat A B)
@@ -195,13 +195,15 @@ end Eq
 
 open Eq
 
+def homotopy {P : α → Type*} (f g : Π (a : α), P a) : Type* :=
+Π (a : α), f a = g a
+
+localized "infix ` ∼ `:50 := homotopy" in hott
+
 namespace homotopy
-section
+open_locale hott
+
 variables {P : α → Type*} (f g h : Π (a : α), P a)
-
-def homotopy : Type* := Π (a : α), f a = g a
-
-infix ` ∼ `:50 := homotopy
 
 def refl : f ∼ f := λ a, rfl
 
@@ -211,12 +213,12 @@ def trans : f ∼ g → g ∼ h → f ∼ h := λ H₁ H₂ a, (H₁ a) ⬝ (H�
 
 def natural {f g : α → β} (H : f ∼ g) (p : a = b) :
   H a ⬝ g ▸ p = f ▸ p ⬝ H b :=
-Eq.ind (λ a, concat_rfl _) a b p
+Eq.ind_on p (λ a, concat_rfl _)
 
 def natural₁ {f : α → α} (H : f ∼ id) (a : α) :
   H (f a) = f ▸ H a :=
 cancel_right (H a)
-  (whisker_left _ (ap_id _)⁻¹ ⬝ natural H (H a))
+  ((_ ⬝l (ap_id _)⁻¹) ⬝ natural H (H a))
 
 
 -- Quasi-equivalence
@@ -226,16 +228,16 @@ structure qequiv (α β : Type*) :=
 (A : f ∘ g ∼ @id β)
 (B : g ∘ f ∼ @id α)
 
-infix ` ≃q `:49 := qequiv
+localized "infix ` ≃q `:49 := homotopy.qequiv" in hott
 
 def qequiv.refl : α ≃q α :=
 { f := id, g := id, A := λ b, rfl, B := λ a, rfl }
 
 -- `def` instead of `instance` use to prevent typeclass loops
-def qequiv.symm [ψ : α ≃q β] : β ≃q α :=
+def qequiv.symm (ψ : α ≃q β) : β ≃q α :=
 ⟨ψ.g, ψ.f, ψ.B, ψ.A⟩
 
-def qequiv.trans [ψ : α ≃q β] [ψ' : β ≃q γ] : α ≃q γ :=
+def qequiv.trans (ψ : α ≃q β) (ψ' : β ≃q γ) : α ≃q γ :=
 { f := ψ'.f ∘ ψ.f,
   g := ψ.g ∘ ψ'.g,
   A := λ c, (ψ'.f ▸ ψ.A (ψ'.g c)) ⬝ ψ'.A c,
@@ -245,15 +247,15 @@ def _root_.Eq.trans.qequiv (p : a = b) (c : α) :
   b = c ≃q a = c :=
 { f := λ (q : b = c), p ⬝ q,
   g := λ (q : a = c), p⁻¹ ⬝ q,
-  A := λ r, (concat_assoc _ _ _)⁻¹ ⬝ (whisker_right (concat_inv _) r),
-  B := λ r, (concat_assoc _ _ _)⁻¹ ⬝ (whisker_right (inv_concat _) r)}
+  A := λ r, (concat_assoc _ _ _)⁻¹ ⬝ ((concat_inv _) ⬝r r),
+  B := λ r, (concat_assoc _ _ _)⁻¹ ⬝ ((inv_concat _) ⬝r r)}
 
 def _root_.Eq.trans.qequiv₁ (p : a = b) (c : α) :
   c = a ≃q c = b :=
 { f := λ (q : c = a), q ⬝ p,
   g := λ (q : c = b), q ⬝ p⁻¹,
-  A := λ r, (concat_assoc _ _ _) ⬝ (whisker_left r (inv_concat _)) ⬝ concat_rfl _,
-  B := λ r, (concat_assoc _ _ _) ⬝ (whisker_left r (concat_inv _)) ⬝ concat_rfl _ }
+  A := λ r, (concat_assoc _ _ _) ⬝ (r ⬝l (inv_concat _)) ⬝ concat_rfl _,
+  B := λ r, (concat_assoc _ _ _) ⬝ (r ⬝l (concat_inv _)) ⬝ concat_rfl _ }
 
 def _root_.Eq.transport.qequiv {P : α → Type*} (p : a = b) :
   P a ≃q P b :=
@@ -265,8 +267,6 @@ def _root_.Eq.transport.qequiv {P : α → Type*} (p : a = b) :
     transport_concat p p⁻¹ u ⬝
       (λ q, @@transport P q u) ▸ concat_inv p }
 
-end
-
 
 structure equiv (α β : Type*) :=
 (f : α → β)
@@ -274,13 +274,13 @@ structure equiv (α β : Type*) :=
 (A : f ∘ g ∼ @id β)
 (B : h ∘ f ∼ @id α)
 
-infix ` ≃ `:49 := equiv
+localized "infix ` ≃ `:49 := homotopy.equiv" in hott
 
 namespace equiv
-def from_qequiv [ψ : α ≃q β] : α ≃ β :=
+def from_qequiv (ψ : α ≃q β) : α ≃ β :=
 ⟨ψ.f, ψ.g, ψ.g, ψ.A, ψ.B⟩
 
-def to_qequiv [φ : α ≃ β] : α ≃q β :=
+def to_qequiv (φ : α ≃ β) : α ≃q β :=
 ⟨φ.f, φ.g, φ.A,
   λ a, (φ.B $ (φ.g ∘ φ.f) a)⁻¹ ⬝
     φ.h ▸ φ.A (φ.f a) ⬝
@@ -290,13 +290,80 @@ def to_qequiv [φ : α ≃ β] : α ≃q β :=
 def uniq (φ : α ≃ β) (φ' : α ≃ β) : φ.f = φ'.f := sorry
 
 def refl {α : Type*} : α ≃ α :=
-@@from_qequiv qequiv.refl
+from_qequiv qequiv.refl
 
-def symm {α : Type*} [φ : α ≃ β] : β ≃ α :=
-@@from_qequiv $ @@qequiv.symm $ @@to_qequiv φ
+def symm {α : Type*} (φ : α ≃ β) : β ≃ α :=
+from_qequiv $ φ.to_qequiv.symm
 
-def trans {α : Type*} [φ : α ≃ β] [φ' : β ≃ γ] : α ≃ γ :=
-@@from_qequiv $ @@qequiv.trans (@@to_qequiv φ) (@@to_qequiv φ')
+def trans {α : Type*} (φ : α ≃ β) (φ' : β ≃ γ) : α ≃ γ :=
+from_qequiv $ qequiv.trans φ.to_qequiv φ'.to_qequiv
 
 end equiv
 end homotopy
+
+
+set_option trace.check true
+
+namespace prod
+open_locale hott
+
+variables (x y : α × β)
+
+set_option pp.notation false
+
+-- This would be extremely painful without tactic mode
+def eq : x = y ≃ (x.pr₁ = y.pr₁) × (x.pr₂ = y.pr₂) :=
+homotopy.equiv.from_qequiv {
+  f := λ p, prod.mk (pr₁ ▸ p) (pr₂ ▸ p),
+  g := λ z, begin
+    induction z with p q,
+    induction x with a b,
+    induction y with c d,
+    apply @Eq.ind_on α _ a c p,
+    apply @Eq.ind_on β _ b d q,
+    spamrfl
+  end,
+  A := λ z, begin
+    induction z with p q,
+    induction x with a b,
+    induction y with c d,
+    apply @Eq.ind_on α _ a c p,
+    apply @Eq.ind_on β _ b d q,
+    spamrfl
+  end,
+  B := λ p, begin
+    apply @Eq.ind_on (α × β)  _ x y p,
+    intro x,
+    induction x with a b,
+    spamrfl
+  end
+}
+
+def pair {x y : α × β} : (x.pr₁ = y.pr₁) × (x.pr₂ = y.pr₂) → x = y :=
+(eq x y).to_qequiv.g
+
+def uniq₁ : x = ⟨x.pr₁, x.pr₂⟩ :=
+@pair _ _ x ⟨x.pr₁, x.pr₂⟩ ⟨rfl, rfl⟩
+
+-- Note the following equalities don't hold definitionally
+example {p : x.pr₁ = y.pr₁} {q : x.pr₂ = y.pr₂} :
+  pr₁ ▸ pair ⟨p, q⟩ = p :=
+begin
+  induction x with a b,
+  induction y with c d,
+  apply @Eq.ind_on α _ a c p,
+  apply @Eq.ind_on β _ b d q,
+  spamrfl
+end
+
+example {r : x = y} : r = pair ⟨pr₁ ▸ r, pr₂ ▸ r⟩ :=
+begin
+  apply @Eq.ind_on (α × β) _ x y r,
+  intro x,
+  induction x with a b,
+  spamrfl
+end
+
+end prod
+
+end hott
