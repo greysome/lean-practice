@@ -11,12 +11,12 @@ variables {α β γ δ : Type*}
 def id : α → α := λ a, a
 
 namespace Eq
+-- Path induction
 @[elab_as_eliminator]
-def ind_on {C : Π (a b : α), a = b → Type*}
-  {a b : α} (p : a = b)
+def ind {C : Π (a b : α), a = b → Type*}
   (c : Π (a : α), C a a rfl) :
-  C a b p :=
-@Eq.rec α a (C a) (c a) b p
+  Π {a b : α} (p : a = b), C a b p :=
+λ a b p, @Eq.rec α a (C a) (c a) b p
 
 -- Based path induction
 @[elab_as_eliminator]

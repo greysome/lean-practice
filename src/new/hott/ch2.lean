@@ -133,6 +133,7 @@ Eq.ind_on p (λ a u, rfl) u
 
 
 namespace eckmann_hilton
+
 -- Preliminaries for proving Eckmann-Hilton
 def pointed : Type* := Σ (α : Type*), α
 
@@ -150,6 +151,7 @@ localized "prefix `Ω²`:50 := eckmann_hilton.loop_space nat.zero.succ.succ" in 
 example : Ω² a = (refl a = rfl) := rfl
 
 
+
 def star {p q : a = b} {r s : b = c} (A : p = q) (B : r = s) :
   p ⬝ r = q ⬝ s :=
 (A ⬝r r) ⬝ (q ⬝l B)
@@ -158,10 +160,10 @@ def star₁ {p q : a = b} {r s : b = c} (A : p = q) (B : r = s) :
   p ⬝ r = q ⬝ s :=
 (p ⬝l B) ⬝ (A ⬝r s)
 
-variables (A B : Ω² a)
 
 -- This should really be done via tactics... 
-def star_eq_concat : star A B = A ⬝ B :=
+def star_eq_concat (A B : Ω² a) :
+  star A B = A ⬝ B :=
 let A' := (concat_rfl rfl) ⬝ A ⬝ (concat_rfl rfl)⁻¹,
   B' := (concat_rfl rfl) ⬝ B ⬝ (concat_rfl rfl)⁻¹,
   h₁ : A' = A := concat_rfl A,
@@ -170,7 +172,8 @@ let A' := (concat_rfl rfl) ⬝ A ⬝ (concat_rfl rfl)⁻¹,
   h₄ : A' ⬝ B = A ⬝ B := (λ x, x ⬝ B) ▸ h₁ in
 h₃ ⬝ h₄
 
-def star₁_eq_concat : star₁ A B = B ⬝ A :=
+def star₁_eq_concat (A B : Ω² a) :
+  star₁ A B = B ⬝ A :=
 let A' := (concat_rfl rfl) ⬝ A ⬝ (concat_rfl rfl)⁻¹,
   B' := (concat_rfl rfl) ⬝ B ⬝ (concat_rfl rfl)⁻¹,
   h₁ : A' = A := concat_rfl A,
@@ -179,13 +182,19 @@ let A' := (concat_rfl rfl) ⬝ A ⬝ (concat_rfl rfl)⁻¹,
   h₄ : B ⬝ A' = B ⬝ A := (λ x, B ⬝ x) ▸ h₁ in
 h₃ ⬝ h₄
 
-def star_eq_star₁ : star A B = star₁ A B :=
+def star_eq_star₁ {p q : a = b} {r s : b = c} (A : p = q) (B : r = s) :
+  star A B = star₁ A B :=
 begin
-  --induction (A : (refl a) = rfl),
-  sorry
+  pinduction p q A,
+  pinduction r s B,
+  intros r₁,
+  pinduction b c r₁,
+  intros b₁ p₁,
+  pinduction a b₁ p₁,
+  spamrfl
 end
 
-def main : A ⬝ B = B ⬝ A :=
+def main (A B : Ω² a) : A ⬝ B = B ⬝ A :=
 (star_eq_concat A B)⁻¹ ⬝ (star_eq_star₁ A B) ⬝ (star₁_eq_concat A B)
 
 end eckmann_hilton
@@ -302,14 +311,11 @@ end equiv
 end homotopy
 
 
-set_option trace.check true
 
 namespace prod
 open_locale hott
 
 variables (x y : α × β)
-
-set_option pp.notation false
 
 -- This would be extremely painful without tactic mode
 def eq : x = y ≃ (x.pr₁ = y.pr₁) × (x.pr₂ = y.pr₂) :=
@@ -319,20 +325,20 @@ homotopy.equiv.from_qequiv {
     induction z with p q,
     induction x with a b,
     induction y with c d,
-    apply @Eq.ind_on α _ a c p,
-    apply @Eq.ind_on β _ b d q,
+    pinduction a c p,
+    pinduction b d q,
     spamrfl
   end,
   A := λ z, begin
     induction z with p q,
     induction x with a b,
     induction y with c d,
-    apply @Eq.ind_on α _ a c p,
-    apply @Eq.ind_on β _ b d q,
+    pinduction a c p,
+    pinduction b d q,
     spamrfl
   end,
   B := λ p, begin
-    apply @Eq.ind_on (α × β)  _ x y p,
+    pinduction x y p,
     intro x,
     induction x with a b,
     spamrfl
@@ -351,14 +357,14 @@ example {p : x.pr₁ = y.pr₁} {q : x.pr₂ = y.pr₂} :
 begin
   induction x with a b,
   induction y with c d,
-  apply @Eq.ind_on α _ a c p,
-  apply @Eq.ind_on β _ b d q,
+  pinduction a c p,
+  pinduction b d q,
   spamrfl
 end
 
 example {r : x = y} : r = pair ⟨pr₁ ▸ r, pr₂ ▸ r⟩ :=
 begin
-  apply @Eq.ind_on (α × β) _ x y r,
+  pinduction x y r,
   intro x,
   induction x with a b,
   spamrfl

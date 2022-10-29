@@ -14,12 +14,13 @@ localized "infix ` = `:50 := Eq" in hott
 localized "notation `rfl` := Eq.refl _" in hott
 
 namespace Eq
--- Path induction
 @[elab_as_eliminator]
-def ind {C : Π (a b : α), a = b → Type*}
+def ind_on {C : Π (a b : α), a = b → Type*}
+  {a b : α} (p : a = b)
   (c : Π (a : α), C a a rfl) :
-  Π {a b : α} (p : a = b), C a b p :=
-λ a b p, @Eq.rec α a (C a) (c a) b p
+  C a b p :=
+@Eq.rec α a (C a) (c a) b p
+
 end Eq
 
 end hott
