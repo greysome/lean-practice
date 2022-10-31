@@ -32,6 +32,24 @@ do
   | _ := fail "argument is not an equality"
   end
 
+-- HoTT-style `rw`
+-- If `lhs_or_rhs` is none then rewrite LHS, else rewrite RHS.
+-- Note this is a *lot* less powerful than the actual `rw`, because
+-- I haven't figured out how they programmed in.
+meta def hrw_aux (e : expr) (lhs_or_rhs : option name) : tactic unit :=
+do
+  match lhs_or_rhs with
+  | some _ := do refine ``(_ ⬝ %%e), refine ``(rfl) <|> skip, skip
+  | none := do refine ``(%%e ⬝ _), refine ``(rfl) <|> skip, skip
+  end
+
+-- HoTT-style `apply`
+-- A *lot* less powerful than the actual `apply`
+meta def happ_aux (e : expr) : tactic unit :=
+do refine ``(%%e ▸ _),
+  refine ``(rfl) <|> skip,
+  skip
+
 end hott
 
 
@@ -42,6 +60,13 @@ setup_tactic_parser
 -- Path induction tactic
 meta def pinduction (a b h : parse ident) : tactic unit :=
 do hott.pinduction_aux a b h
+
+meta def hrw (e : parse parser.pexpr) (lhs_or_rhs : parse ident?)
+  : tactic unit :=
+do e ← to_expr e, hott.hrw_aux e lhs_or_rhs
+
+meta def happ (e : parse parser.pexpr) : tactic unit :=
+do e ← to_expr e, hott.happ_aux e
 
 end interactive
 end tactic

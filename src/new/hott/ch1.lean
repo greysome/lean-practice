@@ -39,20 +39,6 @@ let D : Π (a b : α), a = b → Type* :=
   f : D a b p := Eq.ind_on p d in
 f C c
 
--- Exercise 1.15: indiscernability of identicals follows from path induction
--- The justification for the name `transport` is in ch2
-@[elab_as_eliminator]
-def transport {a b : α} {P : α → Type*} (p : a = b) : P a → P b :=
-Eq.ind_on p (λ a, @id (P a))
-
-localized "postfix `∗ `:51 := Eq.transport" in hott
-
-@[elab_as_eliminator]
-def ap (f : α → β) {a b : α} (p : a = b) : f a = f b :=
-p∗ (refl (f a))
-
-localized "infixr ` ▸ `:75 := Eq.ap" in hott
-
 example {P : α → Type*} {a : α} : @@transport P (refl a) = id := rfl
 example {f : α → β} {a : α} : f ▸ refl a = refl (f a) := rfl
 
@@ -61,11 +47,7 @@ example {f : α → β} {a : α} : f ▸ refl a = refl (f a) := rfl
 def symm {a b : α} : a = b → b = a :=
 λ p, p∗ (refl a)
 
-def trans {a b c : α} : a = b → b = c → a = c :=
-λ p, p∗ (@id (a = c))
-
 localized "postfix `⁻¹`:1034 := Eq.symm" in hott
-localized "infix ` ⬝ `:51 := Eq.trans" in hott
 
 end Eq
 
@@ -438,13 +420,9 @@ begin
   { exact λ m, (add_zero _)⁻¹ },
   { intro m, induction m with m hm,
     { exact (add_zero _) },
-    let h₁ : (n + m.succ).succ = (m.succ + n).succ :=
-      succ ▸ hn m.succ,
-    let h₂ : (m + n).succ.succ = (n + m).succ.succ :=
-      succ ∘ succ ▸ (hn m)⁻¹,
-    let h₃ : (n.succ + m).succ = (m + n.succ).succ :=
-      succ ▸ hm,
-    exact h₁ ⬝ h₂ ⬝ h₃ }
+    hrw (succ ▸ hn m.succ),
+    hrw (succ ∘ succ ▸ (hn m)⁻¹),
+    hrw (succ ▸ hm) }
 end
 
 def one_mul : zero.succ * k = k := add_zero k
@@ -458,48 +436,40 @@ nat.ind_on k rfl (λ k h, h)
 -- `zero_mul : zero * k = zero` holds definitionally
 
 def mul_add : k * (n + m) = k * n + k * m :=
-nat.ind_on k rfl (λ k h,
-  let h₁ : (n + m) + k * (n + m) = (n + m) + (k * n + k * m) :=
-    add (n + m) ▸ h,
-  h₂ : (n + m) + (k * n + k * m) = n + (m + (k * n + k * m)) :=
-    add_assoc n m _,
-  h₃ : n + (m + (k * n + k * m)) = n + ((m + k * n) + k * m) :=
-    add n ▸ (add_assoc _ _ _)⁻¹,
-  h₄ : n + ((m + k * n) + k * m) = n + ((k * n + m) + k * m) :=
-    (λ x, n + (x + k * m)) ▸ add_comm m (k * n),
-  h₅ : n + ((k * n + m) + k * m) = n + (k * n + (m + k * m)) :=
-    add n ▸ add_assoc (k * n) m (k * m),
-  h₆ : n + (k * n + (m + k * m)) = (n + k * n) + (m + k * m) :=
-    (add_assoc n (k * n) _)⁻¹ in
-  h₁ ⬝ h₂ ⬝ h₃ ⬝ h₄ ⬝ h₅ ⬝ h₆)
+begin
+  induction k with k hk, spamrfl,
+  hrw (add (n + m) ▸ hk),
+  hrw (add_assoc n m _),
+  hrw (add n ▸ (add_assoc _ _ _)⁻¹),
+  hrw ((λ x, n + (x + k * m)) ▸ add_comm m (k * n)),
+  hrw (add n ▸ add_assoc (k * n) m (k * m)),
+  hrw (add_assoc n (k * n) _)⁻¹
+end
 
 def add_mul : (n + m) * k = n * k + m * k :=
-nat.ind_on n rfl (λ n h,
-  let h₁ : k + (n + m) * k = k + (n * k + m * k) :=
-    add k ▸ h,
-  h₂ : k + (n * k + m * k) = (k + n * k) + m * k :=
-    (add_assoc _ _ _)⁻¹ in h₁ ⬝ h₂)
+begin
+  induction n with n hn, spamrfl,
+  hrw (add k ▸ hn),
+  hrw (add_assoc _ _ _)⁻¹
+end
 
 def mul_assoc : (k * n) * m = k * (n * m) :=
-nat.ind_on k rfl (λ k h,
-  let h₁ : (n + k * n) * m = n * m + (k * n) * m :=
-    add_mul _ _ _,
-  h₂ : n * m + (k * n) * m = n * m + k * (n * m) :=
-    add (n * m) ▸ h in h₁ ⬝ h₂)
+begin
+  induction k with k hk, spamrfl,
+  hrw (add_mul _ _ _),
+  hrw (add (n * m) ▸ hk)
+end
 
 def mul_comm : n * m = m * n :=
-nat.ind_on n (mul_zero m)⁻¹ (λ n h,
-  let h₁ : m + n * m = n * m + m :=
-    add_comm _ _,
-  h₂ : n * m + m = m * n + m :=
-    (λ x, x + m) ▸ h,
-  h₃ : m * n + m = m * n + m * zero.succ :=
-    add (m * n) ▸ (mul_one m)⁻¹,
-  h₄ : m * n + m * zero.succ = m * (n + zero.succ) :=
-    (mul_add _ _ _)⁻¹,
-  h₅ : m * (n + zero.succ) = m * (zero.succ + n) :=
-    mul m ▸ add_comm _ _ in
-  h₁ ⬝ h₂ ⬝ h₃ ⬝ h₄ ⬝ h₅)
+begin
+  induction n with n hn,
+    exact (mul_zero m)⁻¹,
+  hrw (add_comm _ _),
+  hrw ((λ x, x + m) ▸ hn),
+  hrw (add (m * n) ▸ (mul_one m)⁻¹),
+  hrw (mul_add _ _ _)⁻¹,
+  hrw (mul m ▸ add_comm _ _)
+end
 
 end nat
 

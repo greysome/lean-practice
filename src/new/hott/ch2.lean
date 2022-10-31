@@ -36,14 +36,12 @@ Eq.ind_on p (λ a, (rfl : refl a ⬝ rfl = rfl))
 def rfl_concat : rfl ⬝ p = p := rfl
 
 def inv_concat : p⁻¹ ⬝ p = rfl :=
-let C : Π (a b : α), a = b → Type* := λ a b p, p⁻¹ ⬝ p = rfl in
 Eq.ind_on p (λ a, (rfl : (refl a)⁻¹ ⬝ rfl = rfl))
 
 def concat_inv : p ⬝ p⁻¹ = rfl :=
 Eq.ind_on p (λ a, (rfl : (refl a) ⬝ rfl⁻¹ = rfl))
 
 def inv_inv : p⁻¹⁻¹ = p :=
-let C : Π (a b : α), a = b → Type* := λ a b p, p⁻¹⁻¹ = p in
 Eq.ind_on p (λ a, (rfl : (refl a)⁻¹⁻¹ = rfl))
 
 -- As with `Eq.trans`, one can perform induction three ways.
@@ -161,26 +159,23 @@ def star₁ {p q : a = b} {r s : b = c} (A : p = q) (B : r = s) :
 (p ⬝l B) ⬝ (A ⬝r s)
 
 
--- This should really be done via tactics... 
 def star_eq_concat (A B : Ω² a) :
   star A B = A ⬝ B :=
-let A' := (concat_rfl rfl) ⬝ A ⬝ (concat_rfl rfl)⁻¹,
-  B' := (concat_rfl rfl) ⬝ B ⬝ (concat_rfl rfl)⁻¹,
-  h₁ : A' = A := concat_rfl A,
-  h₂ : B' = B := concat_rfl B,
-  h₃ : A' ⬝ B' = A' ⬝ B := (λ x, A' ⬝ x) ▸ h₂,
-  h₄ : A' ⬝ B = A ⬝ B := (λ x, x ⬝ B) ▸ h₁ in
-h₃ ⬝ h₄
+begin
+  let A' := (concat_rfl rfl) ⬝ A ⬝ (concat_rfl rfl)⁻¹,
+  let B' := (concat_rfl rfl) ⬝ B ⬝ (concat_rfl rfl)⁻¹,
+  hrw ((λ x, A' ⬝ x) ▸ concat_rfl B),
+  hrw ((λ x, x ⬝ B) ▸ concat_rfl A)
+end
 
 def star₁_eq_concat (A B : Ω² a) :
   star₁ A B = B ⬝ A :=
-let A' := (concat_rfl rfl) ⬝ A ⬝ (concat_rfl rfl)⁻¹,
-  B' := (concat_rfl rfl) ⬝ B ⬝ (concat_rfl rfl)⁻¹,
-  h₁ : A' = A := concat_rfl A,
-  h₂ : B' = B := concat_rfl B,
-  h₃ : B' ⬝ A' = B ⬝ A' := (λ x, x ⬝ A') ▸ h₂,
-  h₄ : B ⬝ A' = B ⬝ A := (λ x, B ⬝ x) ▸ h₁ in
-h₃ ⬝ h₄
+begin
+  let A' := (concat_rfl rfl) ⬝ A ⬝ (concat_rfl rfl)⁻¹,
+  let B' := (concat_rfl rfl) ⬝ B ⬝ (concat_rfl rfl)⁻¹,
+  hrw ((λ x, x ⬝ A') ▸ concat_rfl B),
+  hrw ((λ x, B ⬝ x) ▸ concat_rfl A)
+end
 
 def star_eq_star₁ {p q : a = b} {r s : b = c} (A : p = q) (B : r = s) :
   star A B = star₁ A B :=
@@ -315,12 +310,13 @@ end homotopy
 namespace prod
 open_locale hott
 
-variables (x y : α × β)
+variables (x y z : α × β)
 
--- This would be extremely painful without tactic mode
+-- Read: 'paths in product types are characterized by pairs of
+-- paths between the respective components'
 def eq : x = y ≃ (x.pr₁ = y.pr₁) × (x.pr₂ = y.pr₂) :=
 homotopy.equiv.from_qequiv {
-  f := λ p, prod.mk (pr₁ ▸ p) (pr₂ ▸ p),
+  f := λ p, ⟨pr₁ ▸ p, pr₂ ▸ p⟩,
   g := λ z, begin
     induction z with p q,
     induction x with a b,
@@ -370,6 +366,140 @@ begin
   spamrfl
 end
 
+-- Inverse and concatenation is indeed component-wise
+def inv_compwise (p : x = y) : p⁻¹ = pair ⟨(pr₁ ▸ p)⁻¹, (pr₂ ▸ p)⁻¹⟩ :=
+begin
+  pinduction x y p,
+  intro x,
+  induction x with a b,
+  spamrfl
+end
+
+def concat_compwise (p : x = y) (q : y = z) :
+  p ⬝ q = pair ⟨pr₁ ▸ p ⬝ pr₁ ▸ q, pr₂ ▸ p ⬝ pr₂ ▸ q⟩ :=
+begin
+  revert q,
+  pinduction x y p,
+  intros y q,
+  pinduction y z q,
+  intro z,
+  induction z with a b,
+  spamrfl
+end
+
+def transport_compwise (P Q : α → Type*) (p : a = b) (x : P a × Q a) :
+  (p∗ x : P b × Q b) = ⟨p∗ x.pr₁, p∗ x.pr₂⟩ :=
+begin
+  revert x,
+  pinduction a b p,
+  intros a x,
+  exact uniq x
+end
+
+def pair_fn (f : α → γ) (g : β → δ) : α × β → γ × δ :=
+λ x, ⟨f x.pr₁, g x.pr₂⟩
+
+def ap_compwise (f : α → γ) (g : β → δ)
+  (p : x.pr₁ = y.pr₁) (q : x.pr₂ = y.pr₂) :
+pair_fn f g ▸ pair ⟨p, q⟩ = pair ⟨f ▸ p, g ▸ q⟩ :=
+begin
+  induction x with a b,
+  induction y with c d,
+  pinduction a c p,
+  pinduction b d q,
+  spamrfl
+end
+
 end prod
+
+
+
+namespace sigma
+open_locale hott
+
+variables {P : α → Type*} (x y : sigma P)
+
+-- Paths in Σ-types are characterized by pairs of paths between
+-- the respective components modulo transport
+def eq : x = y ≃ Σ (p : x.pr₁ = y.pr₁), (p∗ x.pr₂ : P y.pr₁) = y.pr₂ :=
+homotopy.equiv.from_qequiv {
+  f := λ p, begin
+    pinduction x y p,
+    intro x, exact ⟨rfl, rfl⟩
+  end,
+  g := λ r, begin
+    induction x with a b,
+    induction y with c d,
+    hrw (Eq.lift r.pr₁ b),
+    happ (mk c),
+    exact r.pr₂
+  end,
+  A := λ r, begin
+    induction r with p q,
+    induction x with a b,
+    induction y with c d,
+    change a = c at p,  -- Eliminate dependence on `b` and `d`
+    revert b d q,
+    pinduction a c p,
+    intros a b d q,
+    pinduction b d q,
+    spamrfl
+  end,
+  B := λ p, begin
+    pinduction x y p,
+    intro x,
+    induction x with a b,
+    spamrfl
+  end
+}
+
+def pair {x y : sigma P} :
+  (Σ (p : x.pr₁ = y.pr₁), (p∗ x.pr₂ : P y.pr₁) = y.pr₂) → x = y :=
+(eq x y).to_qequiv.g
+
+def uniq₁ : x = ⟨x.pr₁, x.pr₂⟩ :=
+@pair _ _ x ⟨x.pr₁, x.pr₂⟩ ⟨rfl, rfl⟩
+
+def _root_.Eq.lift₁ (u : P a) : (⟨a, u⟩ : sigma P) = ⟨b, p∗ u⟩ :=
+pair ⟨p, rfl⟩
+
+def transport_compwise (P : α → Type*) (Q : sigma P → Type*)
+  (p : a = b) (r : Σ (u : P a), Q ⟨a, u⟩) :
+  (p∗ ⟨r.pr₁, r.pr₂⟩ : Σ (u : P b), Q ⟨b, u⟩) =
+    ⟨p∗ r.pr₁, (lift p r.pr₁)∗ r.pr₂⟩ :=
+begin
+  revert r,
+  pinduction a b p,
+  spamrfl
+end
+
+end sigma
+
+
+
+namespace unit
+open_locale hott
+
+def eq (a b : unit) : (a = b) ≃ unit :=
+homotopy.equiv.from_qequiv {
+  f := λ p, star,
+  g := λ s, begin
+    induction a,
+    induction b,
+    spamrfl
+  end,
+  A := λ s, begin
+    induction s,
+    spamrfl
+  end,
+  B := λ p, begin
+    pinduction a b p,
+    intro a,
+    induction a,
+    spamrfl
+  end
+}
+
+end unit
 
 end hott
